@@ -1,0 +1,24 @@
+# Editor
+.vscode
+
+# Python — bytecode e caches
+__pycache__/
+*.py[cod]
+
+# Ambientes virtuais
+.venv/
+venv/
+
+# Testes
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Dados baixados/gerados: não versionamos conteúdo bruto, só a pasta
+data/raw/*
+!data/raw/.gitkeep
+
+# Bancos de dados locais (SQLite)
+*.db
+*.sqlite
+*.sqlite3
