@@ -15,7 +15,7 @@
 
 [![Status](https://img.shields.io/badge/Status-In%20Development-orange?style=for-the-badge)]()
 
-💙 The name **Madalena** was inspired by the name of my beloved girlfriend.
+ The name **Madalena** was inspired by the name of my beloved girlfriend.
 
 🇧🇷 The study notes in `docs/` are written in Brazilian Portuguese.
 
