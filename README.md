@@ -70,6 +70,7 @@ Zero search APIs. Every result is computed here.
 | 🧪 **Oracle-verified Tests** | 24 pytest tests; the integration suite proves the index returns exactly what the naive search returns. | ✅ Done |
 | ⏱️ **Naive vs. Indexed Benchmark** | `scripts/comparar_busca.py` times both paths on the real corpus and checks they agree. | ✅ Done |
 | 💻 **CLI** | `indexar` / `buscar` subcommands plus an interactive prompt with context snippets. | ✅ Done |
+| 🖥️ **Local Web UI** | Plain, dependency-free search page (standard-library HTTP server, term highlighting): `python main.py web`. | ✅ Done |
 | 🕷️ **Web Crawler** | URL frontier queue, visited set, depth limit, robots.txt compliance, rate limiting. | 🔨 Planned |
 | 🐳 **Docker** | Containerized indexing and search. | 🔨 Planned |
 
@@ -182,6 +183,12 @@ python -m venv .venv
 .venv\Scripts\python main.py
 ```
 
+Or open the local web interface at `http://127.0.0.1:8080`:
+
+```bash
+.venv\Scripts\python main.py web
+```
+
 **5. Run the tests / benchmark**
 
 ```bash
@@ -208,7 +215,10 @@ Mada-Web-SE/
 │   ├── search/
 │   │   ├── naive.py             # O(n×m) baseline and test oracle
 │   │   ├── query.py             # Boolean AND over the persisted index
-│   │   └── ranker.py            # TF-IDF scoring and ordering
+│   │   ├── ranker.py            # TF-IDF scoring and ordering
+│   │   └── snippet.py           # Context snippet extraction
+│   ├── interface/
+│   │   └── web.py               # Local web UI (stdlib HTTP server)
 │   └── models/
 │       └── document.py          # Immutable Documento record
 ├── assets/                      # README media
@@ -242,6 +252,7 @@ Mada-Web-SE/
 - [x] CLI with snippets + interactive mode
 - [x] Test suite with naive-search oracle (24 tests)
 - [x] Real-corpus benchmark (54× speedup measured)
+- [x] Local web interface (stdlib HTTP server, no dependencies)
 - [ ] Web crawler (frontier queue, visited set, robots.txt, rate limiting)
 - [ ] HTML parsing with BeautifulSoup
 - [ ] OR queries, exact phrases, stemming
