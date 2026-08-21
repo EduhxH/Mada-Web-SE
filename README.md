@@ -62,7 +62,7 @@ Zero search APIs. Every result is computed here.
 | Component / Feature | Description | Status |
 |---|---|---|
 | 📄 **Local Document Source** | Loads `.pdf`, `.txt` and `.md` files (single file or folder). Each PDF page becomes its own document, so results point to the exact page. | ✅ Done |
-| 🔤 **Tokenizer** | Lowercasing, Unicode NFKD accent stripping, token extraction and an explicit stop-word list — applied identically at index time and query time. | ✅ Done |
+| 🔤 **Tokenizer** | Lowercasing, Unicode NFKD accent stripping, token extraction, minimum token length and an explicit stop-word list — applied identically at index time and query time. | ✅ Done |
 | 📚 **Inverted Index** | `term → {doc_id: frequency}` built in a single O(T) pass with `collections.Counter`. | ✅ Done |
 | 🗄️ **SQLite Persistence** | Relational schema (`documents`, `terms`, `postings`) written transactionally; B-tree lookup on terms. | ✅ Done |
 | 🔎 **Boolean AND Search** | Posting-list intersection starting from the smallest list; never rescans documents. | ✅ Done |

@@ -29,8 +29,12 @@ def test_texto_vazio():
     assert tokenizar("") == []
 
 
-def test_numeros_sao_tokens():
-    assert tokenizar("Python 3.11") == ["python", "3", "11"]
+def test_numeros_de_um_digito_sao_descartados():
+    assert tokenizar("Python 3.11") == ["python", "11"]
+
+
+def test_tokens_de_um_caractere_removidos():
+    assert tokenizar("a C 3 programação", remover_stop_words=False) == ["programacao"]
 
 
 def test_stop_words_estao_normalizadas():

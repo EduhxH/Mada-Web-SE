@@ -21,6 +21,8 @@ STOP_WORDS = frozenset(
 
 _PADRAO_TOKEN = re.compile(r"[a-z0-9]+")
 
+COMPRIMENTO_MINIMO = 2
+
 
 def remover_acentos(texto: str) -> str:
     decomposto = unicodedata.normalize("NFKD", texto)
@@ -29,7 +31,10 @@ def remover_acentos(texto: str) -> str:
 
 def tokenizar(texto: str, remover_stop_words: bool = True) -> list[str]:
     normalizado = remover_acentos(texto.lower())
-    tokens = _PADRAO_TOKEN.findall(normalizado)
+    tokens = [
+        t for t in _PADRAO_TOKEN.findall(normalizado)
+        if len(t) >= COMPRIMENTO_MINIMO
+    ]
     if remover_stop_words:
         tokens = [t for t in tokens if t not in STOP_WORDS]
     return tokens
