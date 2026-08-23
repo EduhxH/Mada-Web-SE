@@ -5,11 +5,12 @@ from app.models.document import Documento
 
 _ESQUEMA = """
 CREATE TABLE IF NOT EXISTS documents (
-    id      INTEGER PRIMARY KEY,
-    titulo  TEXT NOT NULL,
-    origem  TEXT NOT NULL,
-    texto   TEXT NOT NULL,
-    tamanho INTEGER NOT NULL
+    id         INTEGER PRIMARY KEY,
+    titulo     TEXT NOT NULL,
+    origem     TEXT NOT NULL,
+    texto      TEXT NOT NULL,
+    tamanho    INTEGER NOT NULL,
+    disciplina TEXT NOT NULL DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS terms (
     id    INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -27,7 +28,19 @@ CREATE TABLE IF NOT EXISTS postings (
 def abrir(caminho: str | Path) -> sqlite3.Connection:
     conexao = sqlite3.connect(caminho)
     conexao.executescript(_ESQUEMA)
+    _migrar(conexao)
     return conexao
+
+
+def _migrar(conexao: sqlite3.Connection) -> None:
+    colunas = {
+        linha[1] for linha in conexao.execute("PRAGMA table_info(documents)")
+    }
+    if "disciplina" not in colunas:
+        with conexao:
+            conexao.execute(
+                "ALTER TABLE documents ADD COLUMN disciplina TEXT NOT NULL DEFAULT ''"
+            )
 
 
 def salvar_indice(
@@ -41,10 +54,10 @@ def salvar_indice(
         conexao.execute("DELETE FROM terms")
         conexao.execute("DELETE FROM documents")
         conexao.executemany(
-            "INSERT INTO documents (id, titulo, origem, texto, tamanho)"
-            " VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO documents (id, titulo, origem, texto, tamanho, disciplina)"
+            " VALUES (?, ?, ?, ?, ?, ?)",
             [
-                (d.id, d.titulo, d.origem, d.texto, tamanhos[d.id])
+                (d.id, d.titulo, d.origem, d.texto, tamanhos[d.id], d.disciplina)
                 for d in documentos
             ],
         )
@@ -81,9 +94,15 @@ def contar_documentos(conexao: sqlite3.Connection) -> int:
 
 def carregar_documento(conexao: sqlite3.Connection, doc_id: int) -> Documento:
     linha = conexao.execute(
-        "SELECT id, titulo, texto, origem FROM documents WHERE id = ?",
+        "SELECT id, titulo, texto, origem, disciplina FROM documents WHERE id = ?",
         (doc_id,),
     ).fetchone()
     if linha is None:
         raise KeyError(f"Documento {doc_id} não existe no índice")
-    return Documento(id=linha[0], titulo=linha[1], texto=linha[2], origem=linha[3])
+    return Documento(
+        id=linha[0],
+        titulo=linha[1],
+        texto=linha[2],
+        origem=linha[3],
+        disciplina=linha[4],
+    )

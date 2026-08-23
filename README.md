@@ -61,7 +61,10 @@ Zero search APIs. Every result is computed here.
 
 | Component / Feature | Description | Status |
 |---|---|---|
-| 📄 **Local Document Source** | Loads `.pdf`, `.txt` and `.md` files (single file or folder). Each PDF page becomes its own document, so results point to the exact page. | ✅ Done |
+| 📄 **Local Document Source** | Loads `.pdf`, `.docx`, `.pptx`, `.txt`, `.md`, `.cs` — including files inside `.zip` archives, read in memory. Each PDF page and each slide becomes its own document, so results point to the exact page/slide. | ✅ Done |
+| 🏷️ **Discipline Metadata** | Folder name becomes the `disciplina` field, shown as a badge in results. | ✅ Done |
+| 📋 **Ingestion Report** | Per-discipline and per-format counts, plus every skipped file with its reason (unsupported format, no extractable text, build artifact, possible personal data). | ✅ Done |
+| 🔒 **Personal-data Guard** | Filenames matching grade patterns (`notas`, `pauta`, `classifica`) are excluded from the index and listed explicitly in the report. | ✅ Done |
 | 🔤 **Tokenizer** | Lowercasing, Unicode NFKD accent stripping, token extraction, minimum token length and an explicit stop-word list — applied identically at index time and query time. | ✅ Done |
 | 📚 **Inverted Index** | `term → {doc_id: frequency}` built in a single O(T) pass with `collections.Counter`. | ✅ Done |
 | 🗄️ **SQLite Persistence** | Relational schema (`documents`, `terms`, `postings`) written transactionally; B-tree lookup on terms. | ✅ Done |
@@ -83,6 +86,8 @@ Zero search APIs. Every result is computed here.
 | Python 3.11 | Core language for the whole engine |
 | SQLite (stdlib `sqlite3`) | Persistent storage for documents, terms and postings |
 | pypdf | PDF text extraction (one document per page) |
+| python-docx / python-pptx | Word and PowerPoint text extraction (one document per slide) |
+| zipfile (stdlib) | Reads archives in memory — no extraction to disk, no zip-slip risk |
 | pytest | Automated unit and integration tests |
 | dataclasses / Counter / regex / unicodedata | Standard-library building blocks — no framework |
 | requests + BeautifulSoup | HTTP fetching and HTML parsing (crawler stage, planned) |

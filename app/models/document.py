@@ -7,3 +7,4 @@ class Documento:
     titulo: str
     texto: str
     origem: str
+    disciplina: str = ""

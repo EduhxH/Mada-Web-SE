@@ -31,6 +31,7 @@ button { padding: 8px 16px; font-size: 15px; border: 1px solid #999; background:
 .resultado { margin-bottom: 20px; }
 .titulo { font-size: 16px; margin: 0; }
 .pontuacao { color: #999; font-size: 12px; margin-left: 6px; }
+.disciplina { color: #555; font-size: 12px; border: 1px solid #ccc; padding: 1px 5px; margin-right: 6px; }
 .trecho { margin: 3px 0 0; font-size: 14px; line-height: 1.5; color: #333; }
 .vazio { color: #666; }
 footer { margin-top: 48px; border-top: 1px solid #ddd; padding-top: 10px; color: #aaa; font-size: 12px; }
@@ -71,9 +72,14 @@ def _renderizar(consulta: str, resultados, duracao_ms: float) -> str:
     ]
     for doc, pontuacao in resultados[:LIMITE_RESULTADOS]:
         trecho = _destacar(gerar_trecho(doc.texto, termos), termos)
+        etiqueta = (
+            f'<span class="disciplina">{html.escape(doc.disciplina)}</span>'
+            if doc.disciplina
+            else ""
+        )
         blocos.append(
             '<div class="resultado">'
-            f'<p class="titulo">{html.escape(doc.titulo)}'
+            f'<p class="titulo">{etiqueta}{html.escape(doc.titulo)}'
             f'<span class="pontuacao">{pontuacao:.4f}</span></p>'
             f'<p class="trecho">{trecho}</p>'
             "</div>"
