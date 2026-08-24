@@ -106,3 +106,60 @@ def carregar_documento(conexao: sqlite3.Connection, doc_id: int) -> Documento:
         origem=linha[3],
         disciplina=linha[4],
     )
+
+
+LOTE_MAXIMO = 500
+
+
+def carregar_documentos(
+    conexao: sqlite3.Connection, doc_ids: list[int]
+) -> dict[int, Documento]:
+    encontrados: dict[int, Documento] = {}
+    for inicio in range(0, len(doc_ids), LOTE_MAXIMO):
+        lote = doc_ids[inicio : inicio + LOTE_MAXIMO]
+        marcadores = ",".join("?" * len(lote))
+        linhas = conexao.execute(
+            "SELECT id, titulo, texto, origem, disciplina FROM documents"
+            f" WHERE id IN ({marcadores})",
+            lote,
+        ).fetchall()
+        for linha in linhas:
+            encontrados[linha[0]] = Documento(
+                id=linha[0],
+                titulo=linha[1],
+                texto=linha[2],
+                origem=linha[3],
+                disciplina=linha[4],
+            )
+    return encontrados
+
+
+def carregar_ids_por_disciplina(
+    conexao: sqlite3.Connection, disciplina: str
+) -> set[int]:
+    linhas = conexao.execute(
+        "SELECT id FROM documents WHERE disciplina = ?", (disciplina,)
+    ).fetchall()
+    return {linha[0] for linha in linhas}
+
+
+def listar_disciplinas(conexao: sqlite3.Connection) -> list[str]:
+    linhas = conexao.execute(
+        "SELECT DISTINCT disciplina FROM documents"
+        " WHERE disciplina <> '' ORDER BY disciplina"
+    ).fetchall()
+    return [linha[0] for linha in linhas]
+
+
+def listar_vocabulario(conexao: sqlite3.Connection) -> list[tuple[str, int]]:
+    return conexao.execute(
+        "SELECT t.termo, COUNT(p.doc_id) FROM terms t"
+        " JOIN postings p ON p.term_id = t.id GROUP BY t.id"
+    ).fetchall()
+
+
+def carregar_origem(conexao: sqlite3.Connection, doc_id: int) -> str | None:
+    linha = conexao.execute(
+        "SELECT origem FROM documents WHERE id = ?", (doc_id,)
+    ).fetchone()
+    return linha[0] if linha else None

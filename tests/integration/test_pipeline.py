@@ -25,7 +25,10 @@ def test_indice_concorda_com_oraculo(tmp_path, documentos):
     ]
     for consulta in consultas:
         esperado = {d.id for d in buscar_ingenua(consulta, documentos)}
-        obtido = {doc.id for doc, _ in buscar(conexao, consulta)}
+        obtido = {
+            doc.id
+            for doc, _ in buscar(conexao, consulta, permitir_ou=False)
+        }
         assert obtido == esperado, f"divergencia na consulta: {consulta!r}"
 
 

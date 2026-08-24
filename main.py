@@ -8,7 +8,7 @@ from app.indexing import storage
 from app.indexing.inverted_index import construir_indice
 from app.indexing.tokenizer import tokenizar
 from app.interface.web import iniciar
-from app.search.query import buscar
+from app.search.query import MODO_OU, buscar_detalhado
 from app.search.snippet import gerar_trecho
 
 CAMINHO_BANCO = Path("data") / "indice.sqlite3"
@@ -59,20 +59,30 @@ def comando_indexar(caminho: str) -> None:
     imprimir_relatorio(relatorio)
 
 
-def comando_buscar(consulta: str) -> None:
+def comando_buscar(consulta: str, disciplina: str | None = None) -> None:
     if not CAMINHO_BANCO.exists():
         print("Indice nao encontrado. Rode antes: python main.py indexar <caminho>")
         return
     conexao = storage.abrir(CAMINHO_BANCO)
     inicio = time.perf_counter()
-    resultados = buscar(conexao, consulta)
+    resultado = buscar_detalhado(conexao, consulta, disciplina)
+    resultados = resultado.documentos
     duracao = time.perf_counter() - inicio
     conexao.close()
 
+    escopo = f" em {disciplina}" if disciplina else ""
+    corrigida = resultado.consulta_corrigida(consulta)
+    if resultado.sugestoes and corrigida.lower() != consulta.lower():
+        print(f'Sera que quis dizer: "{corrigida}"?')
     if not resultados:
-        print(f'Nenhum resultado para "{consulta}".')
+        print(f'Nenhum resultado para "{consulta}"{escopo}.')
         return
-    print(f'{len(resultados)} resultado(s) para "{consulta}" em {duracao * 1000:.1f} ms')
+    print(
+        f'{len(resultados)} resultado(s) para "{consulta}"{escopo}'
+        f" em {duracao * 1000:.1f} ms"
+    )
+    if resultado.modo == MODO_OU:
+        print("Nenhum documento tem todos os termos - correspondencias parciais.")
     print()
     termos = set(tokenizar(consulta))
     for posicao, (doc, pontuacao) in enumerate(resultados[:10], start=1):
@@ -82,6 +92,17 @@ def comando_buscar(consulta: str) -> None:
         print()
     if len(resultados) > 10:
         print(f"(mostrando os 10 primeiros de {len(resultados)})")
+
+
+def comando_disciplinas() -> None:
+    if not CAMINHO_BANCO.exists():
+        print("Indice nao encontrado. Rode antes: python main.py indexar <caminho>")
+        return
+    conexao = storage.abrir(CAMINHO_BANCO)
+    for nome in storage.listar_disciplinas(conexao):
+        quantos = len(storage.carregar_ids_por_disciplina(conexao, nome))
+        print(f"  {nome:<40} {quantos:>5}")
+    conexao.close()
 
 
 def modo_interativo() -> None:
@@ -106,6 +127,8 @@ def main() -> None:
     p_indexar.add_argument("caminho")
     p_buscar = subcomandos.add_parser("buscar", help="busca no indice existente")
     p_buscar.add_argument("consulta")
+    p_buscar.add_argument("--disciplina", help="restringe a uma disciplina")
+    subcomandos.add_parser("disciplinas", help="lista as disciplinas indexadas")
     p_web = subcomandos.add_parser("web", help="inicia a interface web local")
     p_web.add_argument("--porta", type=int, default=8080)
 
@@ -113,7 +136,9 @@ def main() -> None:
     if argumentos.comando == "indexar":
         comando_indexar(argumentos.caminho)
     elif argumentos.comando == "buscar":
-        comando_buscar(argumentos.consulta)
+        comando_buscar(argumentos.consulta, argumentos.disciplina)
+    elif argumentos.comando == "disciplinas":
+        comando_disciplinas()
     elif argumentos.comando == "web":
         iniciar(argumentos.porta)
     else:

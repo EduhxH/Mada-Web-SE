@@ -69,6 +69,11 @@ Zero search APIs. Every result is computed here.
 | 📚 **Inverted Index** | `term → {doc_id: frequency}` built in a single O(T) pass with `collections.Counter`. | ✅ Done |
 | 🗄️ **SQLite Persistence** | Relational schema (`documents`, `terms`, `postings`) written transactionally; B-tree lookup on terms. | ✅ Done |
 | 🔎 **Boolean AND Search** | Posting-list intersection starting from the smallest list; never rescans documents. | ✅ Done |
+| 🎯 **Discipline Filter** | Restrict results to one discipline — another set intersection, applied between search and ranking. CLI `--disciplina`, dropdown on the web UI. | ✅ Done |
+| ✍️ **Spelling Suggestions** | Levenshtein distance over the index vocabulary: unknown query terms get a "did you mean" suggestion, tie-broken by document frequency. Solves singular/plural without lossy stemming. | ✅ Done |
+| 👁️ **Result Preview** | Hover (desktop) or tap "prever" (touch) shows metadata — discipline, type, page, word count, source file — plus a 4x longer highlighted excerpt. Lazy-loaded with a 350ms delay and client-side cache. | ✅ Done |
+| 🔗 **Click to Open** | Results link straight to the source file, served by the engine — PDFs open at the exact page, files inside ZIPs are read in memory. Lookup is by document id, never by user-supplied path. | ✅ Done |
+| 🔀 **OR Fallback** | When no document contains every term, the union is used and results are marked as partial; a coordination factor ranks documents matching more terms higher. | ✅ Done |
 | 📊 **TF-IDF Ranking** | TF = freq / doc length, IDF = log(N / df); rare terms weigh more, long documents don't win by length alone. | ✅ Done |
 | 🧪 **Oracle-verified Tests** | 24 pytest tests; the integration suite proves the index returns exactly what the naive search returns. | ✅ Done |
 | ⏱️ **Naive vs. Indexed Benchmark** | `scripts/comparar_busca.py` times both paths on the real corpus and checks they agree. | ✅ Done |
@@ -258,6 +263,11 @@ Mada-Web-SE/
 - [x] Test suite with naive-search oracle (24 tests)
 - [x] Real-corpus benchmark (54× speedup measured)
 - [x] Local web interface (stdlib HTTP server, no dependencies)
+- [x] Multi-format ingestion (docx, pptx, zip) with ingestion report
+- [x] Discipline filter + batch document loading (N+1 fixed) + precomputed IDF
+- [x] Title and discipline indexed; OR fallback with coordination factor
+- [x] Spelling suggestions (Levenshtein) and click-through document serving
+- [x] Result preview on hover/tap (metadata + long excerpt, lazy + cached)
 - [ ] Web crawler (frontier queue, visited set, robots.txt, rate limiting)
 - [ ] HTML parsing with BeautifulSoup
 - [ ] OR queries, exact phrases, stemming

@@ -8,3 +8,7 @@ class Documento:
     texto: str
     origem: str
     disciplina: str = ""
+
+    @property
+    def texto_pesquisavel(self) -> str:
+        return f"{self.titulo} {self.disciplina} {self.texto}"

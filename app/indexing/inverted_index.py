@@ -10,7 +10,7 @@ def construir_indice(
     indice: dict[str, dict[int, int]] = {}
     tamanhos: dict[int, int] = {}
     for doc in documentos:
-        tokens = tokenizar(doc.texto)
+        tokens = tokenizar(doc.texto_pesquisavel)
         tamanhos[doc.id] = len(tokens)
         for termo, freq in Counter(tokens).items():
             indice.setdefault(termo, {})[doc.id] = freq
