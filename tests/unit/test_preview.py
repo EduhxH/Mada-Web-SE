@@ -74,3 +74,13 @@ def test_fragmento_escapa_html():
 def test_fragmento_com_consulta_vazia_nao_rebenta():
     saida = fragmento(_doc("x/a.pdf"), "")
     assert "PDF" in saida
+
+
+def test_descreve_pagina_web():
+    doc = Documento(
+        1, "Regulamento", "texto da pagina", "https://www.sefo.pt/regulamento", "Escola"
+    )
+    dados = descrever(doc)
+    assert dados["tipo"] == "pagina web"
+    assert dados["ficheiro"] == "https://www.sefo.pt/regulamento"
+    assert "local" not in dados

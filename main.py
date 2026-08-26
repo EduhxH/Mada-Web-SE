@@ -4,9 +4,12 @@ import time
 from pathlib import Path
 
 from app.crawler.local_source import MOTIVO_PRIVADO, Relatorio, carregar
+from app.crawler.web_source import rastrear
+from app.analytics import uso
 from app.indexing import storage
 from app.indexing.inverted_index import construir_indice
 from app.indexing.tokenizer import tokenizar
+from app.interface import auth
 from app.interface.web import iniciar
 from app.search.query import MODO_OU, buscar_detalhado
 from app.search.snippet import gerar_trecho
@@ -94,6 +97,36 @@ def comando_buscar(consulta: str, disciplina: str | None = None) -> None:
         print(f"(mostrando os 10 primeiros de {len(resultados)})")
 
 
+def comando_rastrear(url: str, pasta: str, paginas: int, profundidade: int,
+                     intervalo: float) -> None:
+    destino = Path("data") / "raw" / pasta
+    print(f"A rastrear {url}")
+    print(f"  limite: {paginas} paginas | profundidade: {profundidade}"
+          f" | intervalo: {intervalo}s")
+    inicio = time.perf_counter()
+    relatorio = rastrear(
+        url, destino,
+        max_paginas=paginas,
+        profundidade_maxima=profundidade,
+        intervalo=intervalo,
+    )
+    duracao = time.perf_counter() - inicio
+    print()
+    html = relatorio.guardadas - relatorio.pdfs
+    print(f"Guardadas {relatorio.guardadas} ({html} HTML + {relatorio.pdfs} PDF)"
+          f" em {destino}")
+    print(f"  {relatorio.pedidos} pedidos HTTP em {duracao:.1f}s"
+          f" | profundidade atingida: {relatorio.profundidade_maxima_atingida}")
+    if relatorio.ignoradas:
+        print(f"  ignoradas: {len(relatorio.ignoradas)}")
+        for motivo, quantos in sorted(
+            relatorio.motivos().items(), key=lambda p: -p[1]
+        ):
+            print(f"    {motivo:<28} {quantos:>5}")
+    print()
+    print(f"Agora indexe: python main.py indexar data/raw")
+
+
 def comando_disciplinas() -> None:
     if not CAMINHO_BANCO.exists():
         print("Indice nao encontrado. Rode antes: python main.py indexar <caminho>")
@@ -102,6 +135,62 @@ def comando_disciplinas() -> None:
     for nome in storage.listar_disciplinas(conexao):
         quantos = len(storage.carregar_ids_por_disciplina(conexao, nome))
         print(f"  {nome:<40} {quantos:>5}")
+    conexao.close()
+
+
+def comando_participantes(criar: int, revogar: str | None) -> None:
+    if revogar:
+        if auth.revogar(revogar):
+            print(f"Revogado: {revogar}")
+        else:
+            print(f"Nao encontrado: {revogar}")
+        return
+
+    if criar:
+        novos = auth.criar_participantes(criar)
+        print("CODIGOS NOVOS - copie agora, nao voltam a ser mostrados:")
+        print()
+        for codigo, rotulo in novos.items():
+            print(f"  {rotulo:<12} {codigo}")
+        print()
+
+    participantes = auth.carregar_participantes()
+    if not participantes:
+        print("Nenhum participante. Crie com: python main.py participantes --criar 8")
+        return
+    print(f"{len(participantes)} participante(s) ativo(s):")
+    for rotulo in sorted(participantes.values()):
+        print(f"  {rotulo}")
+    print()
+    print("Os codigos estao guardados como hash HMAC - nao sao recuperaveis.")
+    print("Perdeu um codigo? Revogue e crie outro:")
+    print("  python main.py participantes --revogar aluno-03 --criar 1")
+
+
+def comando_estatisticas() -> None:
+    conexao = uso.abrir()
+    dados = uso.resumo(conexao)
+    print("Resumo de utilizacao")
+    print(f"  buscas .............. {dados['buscas']}")
+    print(f"  participantes ....... {dados['participantes']}")
+    print(f"  dias com uso ........ {dados['dias']}")
+    print(f"  documentos abertos .. {dados['aberturas']}")
+    print(f"  sem resultado ....... {dados['taxa_vazias']:.1f}%")
+    print(f"  parciais (OU) ....... {dados['taxa_parciais']:.1f}%")
+    print(f"  taxa de abertura .... {dados['taxa_abertura']:.1f}%")
+    populares = uso.consultas_populares(conexao, 10)
+    if populares:
+        print()
+        print("Consultas mais frequentes:")
+        for consulta, vezes, vazias in populares:
+            marca = f"  ({vazias} sem resultado)" if vazias else ""
+            print(f"  {vezes:>3}x  {consulta}{marca}")
+    falhadas = uso.consultas_sem_resultado(conexao, 10)
+    if falhadas:
+        print()
+        print("Consultas que falharam:")
+        for consulta, vezes in falhadas:
+            print(f"  {vezes:>3}x  {consulta}")
     conexao.close()
 
 
@@ -129,18 +218,45 @@ def main() -> None:
     p_buscar.add_argument("consulta")
     p_buscar.add_argument("--disciplina", help="restringe a uma disciplina")
     subcomandos.add_parser("disciplinas", help="lista as disciplinas indexadas")
+    p_rastrear = subcomandos.add_parser(
+        "rastrear", help="rastreia um site autorizado e guarda as paginas"
+    )
+    p_rastrear.add_argument("url")
+    p_rastrear.add_argument("--pasta", default="Escola")
+    p_rastrear.add_argument("--paginas", type=int, default=300)
+    p_rastrear.add_argument("--profundidade", type=int, default=3)
+    p_rastrear.add_argument("--intervalo", type=float, default=1.0)
     p_web = subcomandos.add_parser("web", help="inicia a interface web local")
     p_web.add_argument("--porta", type=int, default=8080)
+    p_web.add_argument(
+        "--host", default="127.0.0.1",
+        help="use 0.0.0.0 para aceitar ligacoes de outros dispositivos",
+    )
+    p_part = subcomandos.add_parser(
+        "participantes", help="lista ou cria codigos de acesso"
+    )
+    p_part.add_argument("--criar", type=int, default=0)
+    p_part.add_argument("--revogar", help="rotulo a revogar, ex.: aluno-03")
+    subcomandos.add_parser("estatisticas", help="resumo de utilizacao")
 
     argumentos = analisador.parse_args()
     if argumentos.comando == "indexar":
         comando_indexar(argumentos.caminho)
     elif argumentos.comando == "buscar":
         comando_buscar(argumentos.consulta, argumentos.disciplina)
+    elif argumentos.comando == "rastrear":
+        comando_rastrear(
+            argumentos.url, argumentos.pasta, argumentos.paginas,
+            argumentos.profundidade, argumentos.intervalo,
+        )
     elif argumentos.comando == "disciplinas":
         comando_disciplinas()
     elif argumentos.comando == "web":
-        iniciar(argumentos.porta)
+        iniciar(argumentos.porta, argumentos.host)
+    elif argumentos.comando == "participantes":
+        comando_participantes(argumentos.criar, argumentos.revogar)
+    elif argumentos.comando == "estatisticas":
+        comando_estatisticas()
     else:
         modo_interativo()
 

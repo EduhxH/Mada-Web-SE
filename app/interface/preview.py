@@ -26,6 +26,18 @@ def resolver_origem(origem: str) -> tuple[Path, str | None, int | None, str]:
 
 
 def descrever(doc: Documento) -> dict[str, str]:
+    if doc.origem.startswith(("http://", "https://")):
+        endereco, _, pagina, rotulo = resolver_origem(doc.origem)
+        e_pdf = str(endereco).lower().endswith(".pdf")
+        dados = {
+            "ficheiro": doc.origem.split("#")[0],
+            "tipo": "PDF na web" if e_pdf else "pagina web",
+            "disciplina": doc.disciplina,
+            "palavras": f"{len(doc.texto.split())} palavras",
+        }
+        if pagina:
+            dados["local"] = f"{rotulo} {pagina}"
+        return dados
     caminho, interno, pagina, rotulo = resolver_origem(doc.origem)
     nome = Path(interno).name if interno else caminho.name
     extensao = Path(nome).suffix.lstrip(".").upper()

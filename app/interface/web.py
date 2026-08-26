@@ -1,12 +1,15 @@
 import html
 import mimetypes
 import zipfile
+from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from string import Template
 from urllib.parse import parse_qs, urlencode, urlparse
 
+from app.analytics import uso
 from app.indexing import storage
+from app.interface import auth, estatisticas
 from app.interface.preview import fragmento, resolver_origem
 from app.indexing.tokenizer import tokenizar
 from app.search.query import MODO_OU, buscar_detalhado
@@ -43,6 +46,7 @@ button { padding: 8px 16px; font-size: 15px; border: 1px solid #999; background:
 .trecho { margin: 3px 0 0; font-size: 14px; line-height: 1.5; color: #333; }
 .vazio { color: #666; }
 footer { margin-top: 48px; border-top: 1px solid #ddd; padding-top: 10px; color: #aaa; font-size: 12px; }
+footer a { color: #aaa; }
 
 .prever { display: none; font-size: 12px; color: #24418c; background: none; border: 1px solid #ccc; padding: 2px 8px; margin-top: 6px; cursor: pointer; font-family: inherit; }
 .pv-inline:not(:empty) { border-left: 2px solid #ddd; padding: 8px 0 2px 10px; margin-top: 8px; }
@@ -72,7 +76,7 @@ footer { margin-top: 48px; border-top: 1px solid #ddd; padding-top: 10px; color:
 </form>
 $corpo
 <div id="painel"></div>
-<footer>indice local &middot; sem APIs externas</footer>
+<footer>indice local &middot; sem APIs externas &middot; <a href="/estatisticas">estatisticas</a> &middot; <a href="/sair">sair</a></footer>
 <script>
 (function () {
   var painel = document.getElementById("painel");
@@ -138,6 +142,48 @@ $corpo
 """)
 
 
+_ENTRADA = """<!doctype html>
+<html lang="pt-pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Madalena</title>
+<style>
+body { font-family: Georgia, "Times New Roman", serif; max-width: 420px; margin: 90px auto; padding: 0 20px; color: #1a1a1a; background: #fdfdfd; }
+h1 { font-size: 26px; font-weight: normal; letter-spacing: 2px; margin-bottom: 4px; }
+.sub { color: #777; font-size: 13px; margin: 0 0 26px; }
+input { width: 100%; padding: 10px; font-size: 17px; border: 1px solid #999; font-family: inherit; box-sizing: border-box; letter-spacing: 2px; text-transform: uppercase; }
+button { margin-top: 10px; padding: 9px 18px; font-size: 15px; border: 1px solid #999; background: #eee; cursor: pointer; font-family: inherit; }
+.erro { color: #7a2020; font-size: 13px; margin-top: 12px; }
+.aviso { margin-top: 34px; border-top: 1px solid #ddd; padding-top: 12px; color: #777; font-size: 12px; line-height: 1.6; }
+</style>
+</head>
+<body>
+<h1>Madalena</h1>
+<p class="sub">motor de busca escolar &middot; acesso restrito</p>
+<form method="post" action="/entrar">
+<input type="text" name="codigo" placeholder="CODIGO-ACESSO" autofocus autocomplete="off">
+<button type="submit">entrar</button>
+</form>
+__ERRO__
+<div class="aviso">
+Projeto em fase de teste, restrito a participantes convidados.
+Para avaliar a ferramenta sao registados: as pesquisas feitas, se houve
+resultados e que documentos foram abertos. <b>Nao</b> sao guardados nomes,
+enderecos IP nem qualquer dado pessoal &mdash; cada participante e
+identificado por um rotulo (aluno-01, aluno-02...).
+Nao partilhes o teu codigo.
+</div>
+</body>
+</html>
+"""
+
+
+def _pagina_entrada(erro: str = "") -> bytes:
+    bloco = f'<p class="erro">{html.escape(erro)}</p>' if erro else ""
+    return _ENTRADA.replace("__ERRO__", bloco).encode("utf-8")
+
+
 def _ler_arquivo(origem: str) -> tuple[bytes, str]:
     caminho, interno, _, _ = resolver_origem(origem)
     resolvido = caminho.resolve()
@@ -149,9 +195,20 @@ def _ler_arquivo(origem: str) -> tuple[bytes, str]:
     return resolvido.read_bytes(), resolvido.name
 
 
-def _ligacao(doc) -> str:
+def _ligacao(doc, consulta: str = "", posicao: int | None = None) -> str:
+    parametros = {"id": str(doc.id)}
+    if consulta:
+        parametros["q"] = consulta
+    if posicao:
+        parametros["p"] = str(posicao)
+    if doc.origem.startswith(("http://", "https://")):
+        return "/abrir?" + urlencode(parametros)
     _, _, pagina, _ = resolver_origem(doc.origem)
-    url = f"/documento?id={doc.id}"
+    if consulta:
+        parametros["q"] = consulta
+    if posicao:
+        parametros["p"] = str(posicao)
+    url = "/documento?" + urlencode(parametros)
     if pagina:
         url += f"#page={pagina}"
     return url
@@ -184,7 +241,7 @@ def _bloco_sugestao(resultado, consulta: str, disciplina: str) -> str:
     corrigida = resultado.consulta_corrigida(consulta)
     if corrigida.lower() == consulta.lower():
         return ""
-    destino = "/?" + urlencode({"q": corrigida, "d": disciplina})
+    destino = "/?" + urlencode({"q": corrigida, "d": disciplina, "corrigida": "1"})
     return (
         '<p class="sugestao">Sera que quis dizer: '
         f'<a href="{html.escape(destino)}">{html.escape(corrigida)}</a>?</p>'
@@ -208,7 +265,9 @@ def _renderizar(consulta: str, disciplina: str, resultado) -> str:
         f'<p class="meta">{len(resultado.documentos)} resultado(s){aviso}</p>',
         sugestao,
     ]
-    for doc, pontuacao in resultado.documentos[:LIMITE_RESULTADOS]:
+    for posicao, (doc, pontuacao) in enumerate(
+        resultado.documentos[:LIMITE_RESULTADOS], start=1
+    ):
         trecho = _destacar(gerar_trecho(doc.texto, termos), termos)
         etiqueta = (
             f'<span class="disciplina">{html.escape(doc.disciplina)}</span>'
@@ -218,7 +277,8 @@ def _renderizar(consulta: str, disciplina: str, resultado) -> str:
         blocos.append(
             f'<div class="resultado" data-id="{doc.id}">'
             f'<p class="titulo">{etiqueta}'
-            f'<a href="{html.escape(_ligacao(doc))}" target="_blank">'
+            f'<a href="{html.escape(_ligacao(doc, consulta, posicao))}"'
+            ' target="_blank" rel="noopener">'
             f"{html.escape(doc.titulo)}</a>"
             f'<span class="pontuacao">{pontuacao:.4f}</span></p>'
             f'<p class="trecho">{trecho}</p>'
@@ -234,7 +294,9 @@ def _renderizar(consulta: str, disciplina: str, resultado) -> str:
     return "\n".join(bloco for bloco in blocos if bloco)
 
 
-def _montar_pagina(consulta: str, disciplina: str) -> str:
+def _montar_pagina(
+    consulta: str, disciplina: str, participante: str, corrigida: bool = False
+) -> str:
     disciplinas: list[str] = []
     if not CAMINHO_BANCO.exists():
         corpo = (
@@ -246,6 +308,18 @@ def _montar_pagina(consulta: str, disciplina: str) -> str:
         disciplinas = storage.listar_disciplinas(conexao)
         if consulta:
             resultado = buscar_detalhado(conexao, consulta, disciplina or None)
+            with uso.abrir() as registo:
+                uso.registar(
+                    registo, participante, uso.EVENTO_BUSCA,
+                    consulta=consulta,
+                    disciplina=disciplina or None,
+                    resultados=len(resultado.documentos),
+                    modo=resultado.modo,
+                )
+                if corrigida:
+                    uso.registar(
+                        registo, participante, uso.EVENTO_SUGESTAO, consulta=consulta
+                    )
             corpo = _renderizar(consulta, disciplina, resultado)
         else:
             corpo = ""
@@ -258,22 +332,86 @@ def _montar_pagina(consulta: str, disciplina: str) -> str:
 
 
 class _Manipulador(BaseHTTPRequestHandler):
+    def _participante(self) -> str | None:
+        bruto = self.headers.get("Cookie")
+        if not bruto:
+            return None
+        try:
+            galletas = SimpleCookie(bruto)
+        except Exception:
+            return None
+        item = galletas.get(auth.NOME_COOKIE)
+        if item is None:
+            return None
+        return auth.validar_sessao(item.value, auth.segredo())
+
+    def do_POST(self):
+        if urlparse(self.path).path != "/entrar":
+            self.send_error(404)
+            return
+        tamanho = int(self.headers.get("Content-Length") or 0)
+        corpo = self.rfile.read(min(tamanho, 4096)).decode("utf-8", errors="replace")
+        codigo = parse_qs(corpo).get("codigo", [""])[0]
+        participante = auth.participante_do_codigo(codigo)
+        if participante is None:
+            self._responder(_pagina_entrada("Codigo invalido."), "text/html; charset=utf-8")
+            return
+        sessao = auth.criar_sessao(participante, auth.segredo())
+        with uso.abrir() as registo:
+            uso.registar(registo, participante, uso.EVENTO_ENTRADA)
+        self.send_response(303)
+        self.send_header("Location", "/")
+        self.send_header(
+            "Set-Cookie",
+            f"{auth.NOME_COOKIE}={sessao}; Path=/; HttpOnly; SameSite=Lax;"
+            f" Max-Age={auth.VALIDADE_DIAS * 86400}",
+        )
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
     def do_GET(self):
         url = urlparse(self.path)
         parametros = parse_qs(url.query)
+
+        if url.path == "/sair":
+            self.send_response(303)
+            self.send_header("Location", "/")
+            self.send_header("Set-Cookie", f"{auth.NOME_COOKIE}=; Path=/; Max-Age=0")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
+
+        participante = self._participante()
+        if participante is None:
+            if url.path in ("/", "/entrar"):
+                self._responder(_pagina_entrada(), "text/html; charset=utf-8")
+            else:
+                self.send_error(403, "acesso restrito")
+            return
+
+        if url.path == "/abrir":
+            self._redirecionar(parametros, participante)
+            return
         if url.path == "/documento":
-            self._servir_documento(parametros)
+            self._servir_documento(parametros, participante)
             return
         if url.path == "/preview":
-            self._servir_preview(parametros)
+            self._servir_preview(parametros, participante)
+            return
+        if url.path == "/estatisticas":
+            with uso.abrir() as registo:
+                corpo = estatisticas.pagina(registo).encode("utf-8")
+            self._responder(corpo, "text/html; charset=utf-8")
             return
         if url.path != "/":
             self.send_error(404)
             return
+
         consulta = parametros.get("q", [""])[0].strip()
         disciplina = parametros.get("d", [""])[0].strip()
-        corpo = _montar_pagina(consulta, disciplina).encode("utf-8")
-        self._responder(corpo, "text/html; charset=utf-8")
+        corrigida = parametros.get("corrigida", [""])[0] == "1"
+        corpo = _montar_pagina(consulta, disciplina, participante, corrigida)
+        self._responder(corpo.encode("utf-8"), "text/html; charset=utf-8")
 
     def _doc_pedido(self, parametros):
         bruto = parametros.get("id", [""])[0]
@@ -286,20 +424,50 @@ class _Manipulador(BaseHTTPRequestHandler):
             conexao.close()
         return documentos.get(int(bruto))
 
-    def _servir_preview(self, parametros) -> None:
+    def _redirecionar(self, parametros, participante: str) -> None:
+        doc = self._doc_pedido(parametros)
+        if doc is None or not doc.origem.startswith(("http://", "https://")):
+            self.send_error(404, "documento desconhecido")
+            return
+        posicao = parametros.get("p", [""])[0]
+        with uso.abrir() as registo:
+            uso.registar(
+                registo, participante, uso.EVENTO_ABERTURA,
+                consulta=parametros.get("q", [""])[0],
+                doc_id=doc.id,
+                posicao=int(posicao) if posicao.isdigit() else None,
+            )
+        self.send_response(303)
+        self.send_header("Location", doc.origem.replace("#pagina=", "#page="))
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def _servir_preview(self, parametros, participante: str) -> None:
         doc = self._doc_pedido(parametros)
         if doc is None:
             self.send_error(404, "documento desconhecido")
             return
         consulta = parametros.get("q", [""])[0]
-        corpo = fragmento(doc, consulta).encode("utf-8")
-        self._responder(corpo, "text/html; charset=utf-8")
+        with uso.abrir() as registo:
+            uso.registar(
+                registo, participante, uso.EVENTO_PREVIEW,
+                consulta=consulta, doc_id=doc.id,
+            )
+        self._responder(fragmento(doc, consulta).encode("utf-8"), "text/html; charset=utf-8")
 
-    def _servir_documento(self, parametros) -> None:
+    def _servir_documento(self, parametros, participante: str) -> None:
         doc = self._doc_pedido(parametros)
         if doc is None:
             self.send_error(404, "documento desconhecido")
             return
+        posicao = parametros.get("p", [""])[0]
+        with uso.abrir() as registo:
+            uso.registar(
+                registo, participante, uso.EVENTO_ABERTURA,
+                consulta=parametros.get("q", [""])[0],
+                doc_id=doc.id,
+                posicao=int(posicao) if posicao.isdigit() else None,
+            )
         try:
             dados, nome = _ler_arquivo(doc.origem)
         except (FileNotFoundError, KeyError, PermissionError, zipfile.BadZipFile):
@@ -321,9 +489,15 @@ class _Manipulador(BaseHTTPRequestHandler):
         pass
 
 
-def iniciar(porta: int = 8080) -> None:
-    servidor = ThreadingHTTPServer(("127.0.0.1", porta), _Manipulador)
-    print(f"Madalena no ar em http://127.0.0.1:{porta} (Ctrl+C encerra)")
+def iniciar(porta: int = 8080, host: str = "127.0.0.1") -> None:
+    if not auth.carregar_participantes():
+        print("AVISO: nenhum participante criado ainda.")
+        print("       python main.py participantes --criar 8")
+        print()
+    servidor = ThreadingHTTPServer((host, porta), _Manipulador)
+    if host != "127.0.0.1":
+        print(f"ATENCAO: a aceitar ligacoes de {host} - acesso so por codigo.")
+    print(f"Madalena no ar em http://{host}:{porta} (Ctrl+C encerra)")
     try:
         servidor.serve_forever()
     except KeyboardInterrupt:

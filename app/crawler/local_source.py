@@ -1,4 +1,5 @@
 import io
+import json
 import logging
 import zipfile
 from collections import Counter
@@ -6,6 +7,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import docx
+from bs4 import BeautifulSoup
 from pptx import Presentation
 from pypdf import PdfReader
 
@@ -15,11 +17,18 @@ from app.models.document import Documento
 logging.getLogger("pypdf").setLevel(logging.ERROR)
 
 EXTENSOES_TEXTO = {".txt", ".md", ".cs"}
-EXTENSOES_SUPORTADAS = EXTENSOES_TEXTO | {".pdf", ".docx", ".pptx"}
+EXTENSOES_HTML = {".html", ".htm"}
+EXTENSOES_SUPORTADAS = (
+    EXTENSOES_TEXTO | EXTENSOES_HTML | {".pdf", ".docx", ".pptx"}
+)
+
+ETIQUETAS_SEM_CONTEUDO = ("script", "style", "nav", "header", "footer", "noscript")
 
 PASTAS_IGNORADAS = ("bin/", "obj/", ".vs/", "packages/", "__pycache__/")
 
 PADROES_PRIVADOS = ("notas", "pauta", "classifica")
+
+NOME_MANIFESTO = "_origens.json"
 
 MOTIVO_PRIVADO = "possivel dado pessoal"
 MOTIVO_FORMATO = "formato nao suportado"
@@ -55,11 +64,17 @@ def carregar(caminho: str | Path) -> tuple[list[Documento], Relatorio]:
     else:
         arquivos = [raiz]
 
+    manifestos: dict[Path, dict[str, str]] = {}
     for arquivo in arquivos:
+        if arquivo.name == NOME_MANIFESTO:
+            continue
+        pasta = arquivo.parent
+        if pasta not in manifestos:
+            manifestos[pasta] = _ler_manifesto(pasta)
         _processar(
             nome=arquivo.name,
             dados=arquivo.read_bytes(),
-            origem=str(arquivo),
+            origem=manifestos[pasta].get(arquivo.name, str(arquivo)),
             disciplina=_disciplina(raiz, arquivo),
             documentos=documentos,
             relatorio=relatorio,
@@ -68,11 +83,22 @@ def carregar(caminho: str | Path) -> tuple[list[Documento], Relatorio]:
     return documentos, relatorio
 
 
+def _ler_manifesto(pasta: Path) -> dict[str, str]:
+    caminho = pasta / NOME_MANIFESTO
+    if not caminho.exists():
+        return {}
+    try:
+        dados = json.loads(caminho.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return {}
+    return dados if isinstance(dados, dict) else {}
+
+
 def _disciplina(raiz: Path, arquivo: Path) -> str:
     if not raiz.is_dir():
         return raiz.parent.name
     relativo = arquivo.relative_to(raiz)
-    return relativo.parts[0] if len(relativo.parts) > 1 else raiz.name
+    return relativo.parts[-2] if len(relativo.parts) > 1 else raiz.name
 
 
 def _e_privado(nome: str) -> bool:
@@ -122,6 +148,10 @@ def _processar(
         return
 
     base = Path(nome).stem
+    if extensao in EXTENSOES_HTML:
+        origem = origem_declarada(dados) or origem
+        base = titulo_html(dados) or base
+
     for texto, sufixo_titulo, sufixo_origem in unidades:
         documentos.append(
             Documento(
@@ -175,6 +205,8 @@ def _processar_zip(
 
 
 def _extrair(extensao: str, dados: bytes) -> list[tuple[str, str, str]]:
+    if extensao in EXTENSOES_HTML:
+        return _unidades_html(dados)
     if extensao == ".pdf":
         return _unidades_pdf(dados)
     if extensao == ".pptx":
@@ -222,3 +254,25 @@ def _unidades_docx(dados: bytes) -> list[tuple[str, str, str]]:
 def _unidades_texto(dados: bytes) -> list[tuple[str, str, str]]:
     texto = dados.decode("utf-8", errors="replace")
     return [(texto, "", "")] if texto.strip() else []
+
+
+def _unidades_html(dados: bytes) -> list[tuple[str, str, str]]:
+    sopa = BeautifulSoup(dados.decode("utf-8", errors="replace"), "html.parser")
+    for etiqueta in sopa(list(ETIQUETAS_SEM_CONTEUDO)):
+        etiqueta.decompose()
+    texto = sopa.get_text(" ", strip=True)
+    return [(texto, "", "")] if texto.strip() else []
+
+
+def origem_declarada(dados: bytes) -> str | None:
+    sopa = BeautifulSoup(dados.decode("utf-8", errors="replace"), "html.parser")
+    marca = sopa.find("meta", attrs={"name": "madalena-origem"})
+    return marca.get("content") if marca else None
+
+
+def titulo_html(dados: bytes) -> str | None:
+    sopa = BeautifulSoup(dados.decode("utf-8", errors="replace"), "html.parser")
+    if sopa.title and sopa.title.string:
+        return sopa.title.string.strip()
+    cabecalho = sopa.find("h1")
+    return cabecalho.get_text(strip=True) if cabecalho else None

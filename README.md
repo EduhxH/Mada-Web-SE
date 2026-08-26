@@ -11,7 +11,7 @@
 [![Pytest](https://img.shields.io/badge/Pytest-0A9EDC?style=for-the-badge&logo=pytest&logoColor=white)](https://docs.pytest.org/)
 [![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
 
-*A search engine built from scratch — no Google, no Bing, no third-party search APIs. Real inverted index, real boolean search, real TF-IDF ranking, persisted in SQLite and verified against a naive-search oracle.*
+*A search engine built from scratch for one school — no Google, no Bing, no third-party search APIs. Real crawler, real inverted index, real TF-IDF ranking, persisted in SQLite and verified against a naive-search oracle.*
 
 [![Status](https://img.shields.io/badge/Status-In%20Development-orange?style=for-the-badge)]()
 
@@ -49,9 +49,13 @@
 
 ## 🧩 About
 
-Madalena is a vertical search engine written in Python. It ingests a controlled collection of local documents (PDF, TXT, Markdown), tokenizes and normalizes the text, builds an inverted index with term frequencies, persists everything to SQLite, and answers queries with boolean AND search ranked by TF-IDF — all through a plain command-line interface.
+Madalena is a vertical search engine written in Python, built for the students of one school. School material is scattered across Moodle, Teams, the public site and WhatsApp groups; Madalena puts one search box in front of all of it.
 
-The current test corpus is a 480-page PDF book. Indexing it takes about 40 seconds, paid once; after that every query runs in ~3 ms — about **54× faster** than the naive baseline that rescans the whole collection, and returning **exactly** the same documents (an integration test enforces this equivalence on every run).
+It crawls the school website (respecting `robots.txt`, rate limits and depth), ingests local course material (PDF, DOCX, PPTX, plain text, including files inside ZIP archives), tokenizes and normalizes the text, builds an inverted index with term frequencies, persists everything to SQLite, and answers queries with boolean AND — falling back to OR when nothing matches every term — ranked by TF-IDF.
+
+**Current corpus: 1,797 documents, 18,634 unique terms** — 1,010 pages and PDFs crawled from the school site plus 787 documents across 11 course subjects. Queries run in single-digit milliseconds.
+
+The engine is a **catalogue, not a repository**: results link back to where the document actually lives. Nothing is republished, and no personal data is ever indexed.
 
 Zero search APIs. Every result is computed here.
 
@@ -75,11 +79,15 @@ Zero search APIs. Every result is computed here.
 | 🔗 **Click to Open** | Results link straight to the source file, served by the engine — PDFs open at the exact page, files inside ZIPs are read in memory. Lookup is by document id, never by user-supplied path. | ✅ Done |
 | 🔀 **OR Fallback** | When no document contains every term, the union is used and results are marked as partial; a coordination factor ranks documents matching more terms higher. | ✅ Done |
 | 📊 **TF-IDF Ranking** | TF = freq / doc length, IDF = log(N / df); rare terms weigh more, long documents don't win by length alone. | ✅ Done |
-| 🧪 **Oracle-verified Tests** | 24 pytest tests; the integration suite proves the index returns exactly what the naive search returns. | ✅ Done |
+| 🧪 **Oracle-verified Tests** | 109 pytest tests; the integration suite proves the index returns exactly what the naive search returns. | ✅ Done |
 | ⏱️ **Naive vs. Indexed Benchmark** | `scripts/comparar_busca.py` times both paths on the real corpus and checks they agree. | ✅ Done |
 | 💻 **CLI** | `indexar` / `buscar` subcommands plus an interactive prompt with context snippets. | ✅ Done |
 | 🖥️ **Local Web UI** | Plain, dependency-free search page (standard-library HTTP server, term highlighting): `python main.py web`. | ✅ Done |
-| 🕷️ **Web Crawler** | URL frontier queue, visited set, depth limit, robots.txt compliance, rate limiting. | 🔨 Planned |
+| 🕷️ **Web Crawler** | BFS over an allowed domain: deque frontier, visited set, depth limit, robots.txt (incl. Crawl-delay), rate limiting, sitemap seeding. Saves pages to disk; the original URL survives via an injected meta tag. | ✅ Done |
+| 📎 **PDF Capture** | Crawled PDFs are saved too; an `_origens.json` manifest preserves each file's URL (meta tags can't be injected into a PDF), so results link to the real document at the right page. | ✅ Done |
+| 🌐 **HTML Parsing** | BeautifulSoup extraction with nav/header/footer/script stripped, real `<title>` as document title. | ✅ Done |
+| 🔐 **Invite-code Access** | Per-participant codes exchanged for an HMAC-signed cookie; every route but the login page is closed. Individual codes make usage measurable per person and revocable one at a time. | ✅ Done |
+| 📈 **Usage Analytics** | Separate SQLite log of searches, clicks (with result position), previews and accepted suggestions. `/estatisticas` renders hand-built SVG charts — zero libraries, zero data leaving the machine. Pseudonymised: no names, no IPs. | ✅ Done |
 | 🐳 **Docker** | Containerized indexing and search. | 🔨 Planned |
 
 ---
@@ -95,7 +103,7 @@ Zero search APIs. Every result is computed here.
 | zipfile (stdlib) | Reads archives in memory — no extraction to disk, no zip-slip risk |
 | pytest | Automated unit and integration tests |
 | dataclasses / Counter / regex / unicodedata | Standard-library building blocks — no framework |
-| requests + BeautifulSoup | HTTP fetching and HTML parsing (crawler stage, planned) |
+| requests + BeautifulSoup | HTTP fetching and HTML parsing |
 | Docker | Containerization (planned) |
 
 ---
@@ -117,23 +125,29 @@ IDF(t)      = log(N / df(t))
 | `N` | Total number of documents in the collection | `COUNT(*)` |
 | `df(t)` | Number of documents containing `t` (ubiquitous terms → IDF 0) | posting list size |
 
-Measured complexity in practice (480-document corpus):
+A **coordination factor** (`matched terms / query terms`) multiplies the score, so a document matching 3 of 4 terms outranks one matching a single rare term. In AND mode the factor is always 1, so it changes nothing there.
+
+Measured in practice:
 
 | Operation | Cost | Measured |
 |---|---|---|
-| Indexing (once) | O(T), T = total tokens | ~40 s (PDF extraction dominates) |
-| Indexed query | O(q log n + p + k log k) | ~3 ms |
-| Naive query (baseline) | O(n × m), re-reads everything | ~130 ms |
+| Indexing (once) | O(T), T = total tokens | seconds; paid once |
+| Indexed query | O(q log n + p + k log k) | 3–14 ms |
+| Naive query (baseline) | O(n × m), re-reads everything | ~130 ms (**54× slower**) |
+| Spelling suggestion | O(V × L²), pruned by length and early abandon | only when a term is unknown |
 
 ---
 
 ## 🏗️ Architecture Overview
 
 ```
-Local files (.pdf / .txt / .md)
-      │
-      ▼
- Document source  ──  one Documento per PDF page
+ School website                    Course material
+ (crawler: queue + visited          (.pdf .docx .pptx .txt
+  set + robots.txt + depth)          .cs .md, also inside .zip)
+      │                                   │
+      └───────────────┬───────────────────┘
+                      ▼
+ Document source  ──  one Documento per page / slide / web page
       │
       ▼
  Tokenizer  ──  lowercase → strip accents → tokens → stop words out
@@ -151,12 +165,17 @@ Local files (.pdf / .txt / .md)
       │
       ▼
  Boolean AND  ──  posting intersection, smallest list first
+      │            (falls back to OR when nothing matches everything)
+      ▼
+ Discipline filter  ──  another set intersection
       │
       ▼
- TF-IDF ranker  ──  score + sort
+ TF-IDF ranker  ──  score × coordination factor, then sort
       │
       ▼
- CLI  ──  title, score, context snippet
+ CLI  /  Web UI  ──  title, score, snippet, preview, click-through
+                     (web UI closed behind per-participant invite codes,
+                      every search and click logged for analytics)
 ```
 
 ---
@@ -177,29 +196,48 @@ python -m venv .venv
 .venv\Scripts\python -m pip install -r requirements.txt
 ```
 
-**3. Index a collection** (a file or a whole folder)
+**3. Crawl the school site** (respects robots.txt and rate limits)
 
 ```bash
-.venv\Scripts\python main.py indexar data\raw\your-document.pdf
+.venv\Scripts\python main.py rastrear https://www.sefo.pt --max-paginas 300
 ```
 
-**4. Search**
+**4. Index everything** (crawled pages + local course material)
 
 ```bash
-.venv\Scripts\python main.py buscar "your query here"
+.venv\Scripts\python main.py indexar dataaw
+```
+
+**5. Search from the terminal**
+
+```bash
+.venv\Scripts\python main.py buscar "criterios de avaliacao" --disciplina Matematica
 ```
 
 ```bash
-.venv\Scripts\python main.py
+.venv\Scripts\python main.py disciplinas
 ```
 
-Or open the local web interface at `http://127.0.0.1:8080`:
+**6. Create access codes and start the web UI**
+
+```bash
+.venv\Scripts\python main.py participantes --criar 8
+```
+
+Codes are shown **once** and stored only as an HMAC hash. To replace a lost one:
+
+```bash
+.venv\Scripts\python main.py participantes --revogar aluno-03 --criar 1
+```
 
 ```bash
 .venv\Scripts\python main.py web
 ```
 
-**5. Run the tests / benchmark**
+Add `--host 0.0.0.0` to accept connections from other devices. Access is
+closed: every route but the login page requires a valid code.
+
+**7. Tests, benchmark and usage stats**
 
 ```bash
 .venv\Scripts\python -m pytest
@@ -207,6 +245,10 @@ Or open the local web interface at `http://127.0.0.1:8080`:
 
 ```bash
 .venv\Scripts\python scripts\comparar_busca.py "some query"
+```
+
+```bash
+.venv\Scripts\python main.py estatisticas
 ```
 
 ---
@@ -217,34 +259,33 @@ Or open the local web interface at `http://127.0.0.1:8080`:
 Mada-Web-SE/
 ├── app/
 │   ├── crawler/
-│   │   └── local_source.py      # Local document source (txt/md/pdf, 1 page = 1 doc)
+│   │   ├── web_source.py        # BFS crawler: frontier, robots.txt, sitemap, PDFs
+│   │   └── local_source.py      # Local files (txt/md/cs/pdf/docx/pptx/html, zip)
 │   ├── indexing/
 │   │   ├── tokenizer.py         # Normalization + tokenization rules
 │   │   ├── inverted_index.py    # term → {doc_id: freq} builder
 │   │   └── storage.py           # SQLite schema and persistence
 │   ├── search/
 │   │   ├── naive.py             # O(n×m) baseline and test oracle
-│   │   ├── query.py             # Boolean AND over the persisted index
-│   │   ├── ranker.py            # TF-IDF scoring and ordering
+│   │   ├── query.py             # AND/OR search, discipline filter, suggestions
+│   │   ├── ranker.py            # TF-IDF + coordination factor
+│   │   ├── spelling.py          # Levenshtein distance and suggestions
 │   │   └── snippet.py           # Context snippet extraction
 │   ├── interface/
-│   │   └── web.py               # Local web UI (stdlib HTTP server)
+│   │   ├── web.py               # HTTP server, routes, session handling
+│   │   ├── auth.py              # Invite codes (hashed) and signed sessions
+│   │   ├── preview.py           # Result preview fragments
+│   │   └── estatisticas.py      # Analytics page with hand-built SVG charts
+│   ├── analytics/
+│   │   └── uso.py               # Usage event log and aggregations
 │   └── models/
 │       └── document.py          # Immutable Documento record
-├── assets/                      # README media
-├── data/
-│   └── raw/                     # Test corpus (git-ignored)
-├── docs/                        # Study notes per stage (pt-BR)
-├── scripts/
-│   └── comparar_busca.py        # Naive vs. indexed benchmark
-├── tests/
-│   ├── unit/                    # Tokenizer, naive, index, ranker
-│   └── integration/             # Full pipeline + oracle equivalence
+├── data/                        # Corpus, index, secrets — all git-ignored
+├── docs/                        # Design and study notes (pt)
+├── scripts/comparar_busca.py    # Naive vs. indexed benchmark
+├── tests/{unit,integration}/    # 109 tests
 ├── main.py                      # CLI entry point
-├── pytest.ini
-├── requirements.txt
-├── Dockerfile                   # Placeholder (Docker stage)
-└── docker-compose.yml           # Placeholder (Docker stage)
+└── .env.example                 # MADALENA_SEGREDO for deployment
 ```
 
 ---
@@ -268,8 +309,10 @@ Mada-Web-SE/
 - [x] Title and discipline indexed; OR fallback with coordination factor
 - [x] Spelling suggestions (Levenshtein) and click-through document serving
 - [x] Result preview on hover/tap (metadata + long excerpt, lazy + cached)
-- [ ] Web crawler (frontier queue, visited set, robots.txt, rate limiting)
-- [ ] HTML parsing with BeautifulSoup
+- [x] Web crawler (frontier queue, visited set, robots.txt, rate limiting)
+- [x] PDF capture from the crawled site (URL preserved via manifest)
+- [x] Closed beta: invite codes, signed sessions, usage analytics with charts
+- [x] HTML parsing with BeautifulSoup
 - [ ] OR queries, exact phrases, stemming
 - [ ] Docker image and compose setup
 - [ ] Reimplement selected modules in TypeScript and Go for comparison
@@ -278,10 +321,21 @@ Mada-Web-SE/
 
 ## ⚠️ Known Limitations
 
-- **AND-only queries** — OR, exact phrases and stemming are future work.
-- **PDF small-caps artifacts** — decorative headings like "INVERSÃO" extract as "I NVERSÃO", splitting tokens; body text is unaffected.
-- **Doc lengths loaded per query** — irrelevant at hundreds of documents, worth optimizing at millions.
-- **No web crawler yet** — the source is local files; the crawler stage will respect robots.txt, rate limits and allowed domains, and will never bypass authentication or CAPTCHAs.
+- **Moodle and Teams are not connected yet.** Course material is currently
+  downloaded by hand, so it goes stale. Automatic sync needs API access
+  granted by an administrator — the engine will never automate a student
+  login or scrape with someone's credentials.
+- **Scanned documents are invisible.** A photographed worksheet has no text
+  layer; OCR is out of scope for now.
+- **Singular ≠ plural.** `horario` and `horarios` are different terms. The
+  spelling suggester bridges the gap without the information loss of
+  stemming, but it is a suggestion, not a match.
+- **All results are hydrated before paging.** A 167-result query loads every
+  document's text to display 20. Harmless at this size; pagination is the fix.
+- **Plain HTTP.** Over a local network the access code travels in clear text;
+  serving beyond localhost should go through an HTTPS tunnel.
+- **No personal data, by design.** Grades, class lists and contacts are
+  excluded from the index and always will be.
 
 ---
 

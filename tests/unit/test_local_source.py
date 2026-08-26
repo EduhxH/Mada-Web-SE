@@ -78,3 +78,11 @@ def test_ids_sao_sequenciais(tmp_path):
     _criar(tmp_path / "B", "dois.txt")
     documentos, _ = carregar(tmp_path)
     assert [d.id for d in documentos] == [1, 2]
+
+
+def test_disciplina_e_a_pasta_mais_proxima(tmp_path):
+    # data/raw/psi9/Matematica/ficha.txt -> "Matematica", nao "psi9"
+    _criar(tmp_path / "psi9" / "Matematica", "ficha.txt")
+    _criar(tmp_path / "Escola", "pagina.txt")
+    documentos, _ = carregar(tmp_path)
+    assert {d.disciplina for d in documentos} == {"Matematica", "Escola"}

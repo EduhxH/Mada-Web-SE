@@ -18,6 +18,15 @@ htmlcov/
 data/raw/*
 !data/raw/.gitkeep
 
+# Livros e material com direitos de autor: nunca versionar
+data/livros/
+
+# Segredos e dados de participantes: NUNCA versionar
+.env
+data/segredo.txt
+data/participantes.json
+data/uso.sqlite3
+
 # Bancos de dados locais (SQLite)
 *.db
 *.sqlite
