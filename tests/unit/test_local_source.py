@@ -86,3 +86,13 @@ def test_disciplina_e_a_pasta_mais_proxima(tmp_path):
     _criar(tmp_path / "Escola", "pagina.txt")
     documentos, _ = carregar(tmp_path)
     assert {d.disciplina for d in documentos} == {"Matematica", "Escola"}
+
+
+def test_titulo_a_partir_do_url():
+    from app.crawler.local_source import titulo_de_url
+
+    assert titulo_de_url(
+        "https://www.sefo.pt/wp-content/uploads/REGULAMENTO-INTERNO-APROVADO.pdf"
+    ) == "REGULAMENTO INTERNO APROVADO"
+    assert titulo_de_url("https://www.sefo.pt/oferta-formativa/cursos/") == "cursos"
+    assert titulo_de_url("https://www.sefo.pt/") == ""

@@ -20,6 +20,9 @@ STOP_WORDS = frozenset(
 )
 
 _PADRAO_TOKEN = re.compile(r"[a-z0-9]+")
+# FichaRevisoes -> Ficha Revisoes; GestCampeonato -> Gest Campeonato.
+# Sem isto, nomes de ficheiro sem espacos viram um unico token inutil.
+_PADRAO_CAMEL = re.compile(r"([a-z0-9])([A-Z])")
 
 COMPRIMENTO_MINIMO = 2
 
@@ -30,7 +33,8 @@ def remover_acentos(texto: str) -> str:
 
 
 def tokenizar(texto: str, remover_stop_words: bool = True) -> list[str]:
-    normalizado = remover_acentos(texto.lower())
+    separado = _PADRAO_CAMEL.sub(lambda m: m.group(1) + " " + m.group(2), texto)
+    normalizado = remover_acentos(separado.lower())
     tokens = [
         t for t in _PADRAO_TOKEN.findall(normalizado)
         if len(t) >= COMPRIMENTO_MINIMO

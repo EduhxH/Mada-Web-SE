@@ -51,9 +51,11 @@
 
 Madalena is a vertical search engine written in Python, built for the students of one school. School material is scattered across Moodle, Teams, the public site and WhatsApp groups; Madalena puts one search box in front of all of it.
 
-It crawls the school website (respecting `robots.txt`, rate limits and depth), ingests local course material (PDF, DOCX, PPTX, plain text, including files inside ZIP archives), tokenizes and normalizes the text, builds an inverted index with term frequencies, persists everything to SQLite, and answers queries with boolean AND — falling back to OR when nothing matches every term — ranked by TF-IDF.
+It crawls the school website (respecting `robots.txt`, rate limits and depth), ingests local course material (PDF, DOCX, PPTX, plain text, including files inside ZIP archives), tokenizes and normalizes the text, builds an inverted index with term frequencies, and persists everything to SQLite.
 
-**Current corpus: 1,797 documents, 18,634 unique terms** — 1,010 pages and PDFs crawled from the school site plus 787 documents across 11 course subjects. Queries run in single-digit milliseconds.
+Queries are answered with graceful relaxation — all terms, then a quorum, then any — ranked by TF-IDF with a title boost, expanded across singular/plural variants, and grouped into sections so results stay legible.
+
+**Current corpus: 1,797 documents, 18,135 unique terms** — 1,010 pages and PDFs crawled from the school site plus 787 documents across 11 course subjects. Queries run in single-digit milliseconds.
 
 The engine is a **catalogue, not a repository**: results link back to where the document actually lives. Nothing is republished, and no personal data is ever indexed.
 
@@ -69,7 +71,7 @@ Zero search APIs. Every result is computed here.
 | 🏷️ **Discipline Metadata** | Folder name becomes the `disciplina` field, shown as a badge in results. | ✅ Done |
 | 📋 **Ingestion Report** | Per-discipline and per-format counts, plus every skipped file with its reason (unsupported format, no extractable text, build artifact, possible personal data). | ✅ Done |
 | 🔒 **Personal-data Guard** | Filenames matching grade patterns (`notas`, `pauta`, `classifica`) are excluded from the index and listed explicitly in the report. | ✅ Done |
-| 🔤 **Tokenizer** | Lowercasing, Unicode NFKD accent stripping, token extraction, minimum token length and an explicit stop-word list — applied identically at index time and query time. | ✅ Done |
+| 🔤 **Tokenizer** | camelCase splitting (`FichaRevisoes` → `ficha revisoes`), lowercasing, Unicode NFKD accent stripping, token extraction, minimum token length and an explicit stop-word list — applied identically at index time and query time. | ✅ Done |
 | 📚 **Inverted Index** | `term → {doc_id: frequency}` built in a single O(T) pass with `collections.Counter`. | ✅ Done |
 | 🗄️ **SQLite Persistence** | Relational schema (`documents`, `terms`, `postings`) written transactionally; B-tree lookup on terms. | ✅ Done |
 | 🔎 **Boolean AND Search** | Posting-list intersection starting from the smallest list; never rescans documents. | ✅ Done |
@@ -77,9 +79,12 @@ Zero search APIs. Every result is computed here.
 | ✍️ **Spelling Suggestions** | Levenshtein distance over the index vocabulary: unknown query terms get a "did you mean" suggestion, tie-broken by document frequency. Solves singular/plural without lossy stemming. | ✅ Done |
 | 👁️ **Result Preview** | Hover (desktop) or tap "prever" (touch) shows metadata — discipline, type, page, word count, source file — plus a 4x longer highlighted excerpt. Lazy-loaded with a 350ms delay and client-side cache. | ✅ Done |
 | 🔗 **Click to Open** | Results link straight to the source file, served by the engine — PDFs open at the exact page, files inside ZIPs are read in memory. Lookup is by document id, never by user-supplied path. | ✅ Done |
-| 🔀 **OR Fallback** | When no document contains every term, the union is used and results are marked as partial; a coordination factor ranks documents matching more terms higher. | ✅ Done |
+| 🪜 **Graceful Relaxation** | Three levels — all terms, then a quorum of `max(2, ⌈0.6q⌉)`, then any term — stepping down only until results appear. One counting pass yields every level. | ✅ Done |
+| ✅ **Auto-correction** | Typos at edit distance 1 whose correction is backed by 3+ documents are applied automatically, with a one-click escape back to the literal query. | ✅ Done |
+| 🔁 **Morphological Expansion** | Singular/plural variants are added to the query — rules propose, the index vocabulary decides, so nothing is ever invented. Fixes 25% of the vocabulary being duplicated by number, without the information loss of stemming. | ✅ Done |
+| ⬆️ **Title Boost** | A hit in the title outweighs one in the body — the title says what a document *is*, the body only what it mentions. Applied after ranking, at no extra I/O cost. | ✅ Done |
 | 📊 **TF-IDF Ranking** | TF = freq / doc length, IDF = log(N / df); rare terms weigh more, long documents don't win by length alone. | ✅ Done |
-| 🧪 **Oracle-verified Tests** | 109 pytest tests; the integration suite proves the index returns exactly what the naive search returns. | ✅ Done |
+| 🧪 **Oracle-verified Tests** | 247 pytest tests; the integration suite proves the index returns exactly what the naive search returns. | ✅ Done |
 | ⏱️ **Naive vs. Indexed Benchmark** | `scripts/comparar_busca.py` times both paths on the real corpus and checks they agree. | ✅ Done |
 | 💻 **CLI** | `indexar` / `buscar` subcommands plus an interactive prompt with context snippets. | ✅ Done |
 | 🖥️ **Local Web UI** | Plain, dependency-free search page (standard-library HTTP server, term highlighting): `python main.py web`. | ✅ Done |
@@ -88,6 +93,10 @@ Zero search APIs. Every result is computed here.
 | 🌐 **HTML Parsing** | BeautifulSoup extraction with nav/header/footer/script stripped, real `<title>` as document title. | ✅ Done |
 | 🔐 **Invite-code Access** | Per-participant codes exchanged for an HMAC-signed cookie; every route but the login page is closed. Individual codes make usage measurable per person and revocable one at a time. | ✅ Done |
 | 📈 **Usage Analytics** | Separate SQLite log of searches, clicks (with result position), previews and accepted suggestions. `/estatisticas` renders hand-built SVG charts — zero libraries, zero data leaving the machine. Pseudonymised: no names, no IPs. | ✅ Done |
+| 💡 **Query Suggestions** | Dropdown combining the participant's own history, queries popular across the group, and real index vocabulary completing the last word. Only ever suggests queries that returned results. | ✅ Done |
+| 🧭 **Discipline Landing** | Picking a subject with no query shows its characteristic topics (discipline-level TF-IDF, with a coverage ceiling that filters out boilerplate), what the class searched for, and its most-opened documents. | ✅ Done |
+| 🧠 **Portuguese POS Tagging** | Suffix-rule tagger that demotes infinitives, gerunds, participles, adverbs and conjugated forms from topic candidates, guarded by exception lists so nouns like *professor*, *calor* or *velocidade* survive. Demotion only affects topic suggestions — never the index or search. | ✅ Done |
+| 🗂️ **Result Sections** | Results are grouped into Horários / Fichas e materiais / Regulamentos / Páginas do site, ordered so the section holding the best hit leads. Grouping is skipped when everything falls in one section; each section links to its full listing. | ✅ Done |
 | 🐳 **Docker** | Containerized indexing and search. | 🔨 Planned |
 
 ---
@@ -205,7 +214,8 @@ python -m venv .venv
 **4. Index everything** (crawled pages + local course material)
 
 ```bash
-.venv\Scripts\python main.py indexar dataaw
+.venv\Scripts\python main.py indexar data
+aw
 ```
 
 **5. Search from the terminal**
@@ -283,7 +293,7 @@ Mada-Web-SE/
 ├── data/                        # Corpus, index, secrets — all git-ignored
 ├── docs/                        # Design and study notes (pt)
 ├── scripts/comparar_busca.py    # Naive vs. indexed benchmark
-├── tests/{unit,integration}/    # 109 tests
+├── tests/{unit,integration}/    # 247 tests
 ├── main.py                      # CLI entry point
 └── .env.example                 # MADALENA_SEGREDO for deployment
 ```
@@ -312,6 +322,13 @@ Mada-Web-SE/
 - [x] Web crawler (frontier queue, visited set, robots.txt, rate limiting)
 - [x] PDF capture from the crawled site (URL preserved via manifest)
 - [x] Closed beta: invite codes, signed sessions, usage analytics with charts
+- [x] Query suggestions (history + popular + vocabulary) with k-anonymity threshold
+- [x] Discipline landing page with characteristic-topic extraction
+- [x] POS tagging, topic stop words and lift-based scoring to clean topics
+- [x] Corpus-driven noise filters: cross-discipline spread, verb detection by infinitive lookup
+- [x] Result sections and readable titles for crawled documents
+- [x] Tolerant search: quorum relaxation, auto-correction, title boosting
+- [x] Morphological query expansion (singular/plural), validated against the index
 - [x] HTML parsing with BeautifulSoup
 - [ ] OR queries, exact phrases, stemming
 - [ ] Docker image and compose setup
@@ -327,17 +344,37 @@ Mada-Web-SE/
   login or scrape with someone's credentials.
 - **Scanned documents are invisible.** A photographed worksheet has no text
   layer; OCR is out of scope for now.
-- **Singular ≠ plural.** `horario` and `horarios` are different terms. The
-  spelling suggester bridges the gap without the information loss of
-  stemming, but it is a suggestion, not a match.
 - **All results are hydrated before paging.** A 167-result query loads every
   document's text to display 20. Harmless at this size; pagination is the fix.
 - **Plain HTTP.** Over a local network the access code travels in clear text;
   serving beyond localhost should go through an HTTPS tunnel.
+- **No semantic matching.** Paraphrases ("how do I justify an absence") do not
+  reach documents phrased differently. Morphological expansion covers number,
+  spelling suggestions cover typos, but synonyms and rewording are out of reach
+  without embeddings.
+- **Topic extraction has honest residue.** Imperatives (`crie`), abbreviations
+  (`trab`, `ctrl`), PDF extraction artefacts (`passagemde`) and typos in the
+  source documents still surface occasionally.
 - **No personal data, by design.** Grades, class lists and contacts are
   excluded from the index and always will be.
 
 ---
+
+## 📚 Design Notes
+
+Every stage is written up in `docs/`, in Portuguese, with the measurements that
+drove each decision:
+
+| | |
+|---|---|
+| `01`–`03` | Architecture, data structures, Big O |
+| `04`–`05` | Implementation walkthrough, local web UI |
+| `06` | Source architecture: site, Moodle, Teams, and the ACL model |
+| `07`–`09` | Relevance, spelling correction, result preview |
+| `10`–`11` | Web crawler; closed beta access and usage metrics |
+| `12`–`13` | Query suggestions, discipline landing page |
+| `14` | POS tagging and topic-noise removal (three rounds, with rejected rules) |
+| `15`–`17` | Result sections, tolerant search, morphological expansion |
 
 ## 🧠 What I Learned
 

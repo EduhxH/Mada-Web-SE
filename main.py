@@ -11,7 +11,7 @@ from app.indexing.inverted_index import construir_indice
 from app.indexing.tokenizer import tokenizar
 from app.interface import auth
 from app.interface.web import iniciar
-from app.search.query import MODO_OU, buscar_detalhado
+from app.search.query import MODO_OU, MODO_QUORUM, buscar_detalhado
 from app.search.snippet import gerar_trecho
 
 CAMINHO_BANCO = Path("data") / "indice.sqlite3"
@@ -84,8 +84,15 @@ def comando_buscar(consulta: str, disciplina: str | None = None) -> None:
         f'{len(resultados)} resultado(s) para "{consulta}"{escopo}'
         f" em {duracao * 1000:.1f} ms"
     )
-    if resultado.modo == MODO_OU:
-        print("Nenhum documento tem todos os termos - correspondencias parciais.")
+    if resultado.correcao:
+        print(f'A mostrar resultados para "{resultado.consulta_aplicada(consulta)}".')
+    if resultado.modo == MODO_QUORUM:
+        print(
+            f"Nenhum documento tem os {resultado.termos_totais} termos;"
+            f" a mostrar os que tem pelo menos {resultado.termos_exigidos}."
+        )
+    elif resultado.modo == MODO_OU:
+        print("A mostrar documentos com algum dos termos.")
     print()
     termos = set(tokenizar(consulta))
     for posicao, (doc, pontuacao) in enumerate(resultados[:10], start=1):

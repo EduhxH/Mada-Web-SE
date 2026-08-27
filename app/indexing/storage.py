@@ -1,6 +1,7 @@
 import sqlite3
 from pathlib import Path
 
+from app.indexing.tokenizer import remover_acentos
 from app.models.document import Documento
 
 _ESQUEMA = """
@@ -22,11 +23,16 @@ CREATE TABLE IF NOT EXISTS postings (
     freq    INTEGER NOT NULL,
     PRIMARY KEY (term_id, doc_id)
 );
+CREATE INDEX IF NOT EXISTS idx_postings_doc ON postings(doc_id);
+CREATE INDEX IF NOT EXISTS idx_documents_disciplina ON documents(disciplina);
 """
 
 
 def abrir(caminho: str | Path) -> sqlite3.Connection:
     conexao = sqlite3.connect(caminho)
+    conexao.create_function(
+        "sem_acento", 1, lambda s: remover_acentos(s.lower()) if s else ""
+    )
     conexao.executescript(_ESQUEMA)
     _migrar(conexao)
     return conexao
@@ -163,3 +169,104 @@ def carregar_origem(conexao: sqlite3.Connection, doc_id: int) -> str | None:
         "SELECT origem FROM documents WHERE id = ?", (doc_id,)
     ).fetchone()
     return linha[0] if linha else None
+
+
+def _filtro_administrativo(padroes, extensoes=()) -> str:
+    partes = [
+        f"AND sem_acento(titulo) NOT LIKE '%{padrao}%'" for padrao in padroes
+    ]
+    partes += [
+        f"AND sem_acento(origem) NOT LIKE '%{ext}%'" for ext in extensoes
+    ]
+    return " ".join(partes)
+
+
+def contar_por_disciplina(
+    conexao: sqlite3.Connection, disciplina: str, apenas_conteudo: bool = False
+) -> int:
+    from app.search.temas import EXTENSOES_NAO_TEMATICAS, PADROES_ADMINISTRATIVOS
+
+    extra = (
+        _filtro_administrativo(PADROES_ADMINISTRATIVOS, EXTENSOES_NAO_TEMATICAS)
+        if apenas_conteudo
+        else ""
+    )
+    return conexao.execute(
+        f"SELECT COUNT(*) FROM documents WHERE disciplina = ? {extra}",
+        (disciplina,),
+    ).fetchone()[0]
+
+
+def df_na_disciplina(
+    conexao: sqlite3.Connection,
+    disciplina: str,
+    minimo: int = 2,
+    excluir_administrativos: bool = False,
+) -> list[tuple[str, int, int]]:
+    extra = ""
+    if excluir_administrativos:
+        from app.search.temas import EXTENSOES_NAO_TEMATICAS, PADROES_ADMINISTRATIVOS
+
+        extra = _filtro_administrativo(
+            PADROES_ADMINISTRATIVOS, EXTENSOES_NAO_TEMATICAS
+        )
+    na_disciplina = conexao.execute(
+        "SELECT p.term_id, COUNT(*) FROM postings p"
+        " JOIN documents d ON d.id = p.doc_id"
+        f" WHERE d.disciplina = ? {extra}"
+        " GROUP BY p.term_id HAVING COUNT(*) >= ?",
+        (disciplina, minimo),
+    ).fetchall()
+    if not na_disciplina:
+        return []
+
+    globais = dict(
+        conexao.execute("SELECT term_id, COUNT(*) FROM postings GROUP BY term_id")
+    )
+    nomes = dict(conexao.execute("SELECT id, termo FROM terms"))
+    return [
+        (nomes[term_id], df_disc, globais.get(term_id, df_disc))
+        for term_id, df_disc in na_disciplina
+        if term_id in nomes
+    ]
+
+
+def documentos_da_disciplina(
+    conexao: sqlite3.Connection, disciplina: str, limite: int = 10
+) -> list[tuple[int, str]]:
+    return conexao.execute(
+        "SELECT id, titulo FROM documents WHERE disciplina = ?"
+        " ORDER BY tamanho DESC LIMIT ?",
+        (disciplina, limite),
+    ).fetchall()
+
+
+def disciplinas_dos_documentos(
+    conexao: sqlite3.Connection, doc_ids: list[int]
+) -> dict[int, tuple[str, str]]:
+    if not doc_ids:
+        return {}
+    marcadores = ",".join("?" * len(doc_ids))
+    linhas = conexao.execute(
+        f"SELECT id, disciplina, titulo FROM documents WHERE id IN ({marcadores})",
+        doc_ids,
+    ).fetchall()
+    return {linha[0]: (linha[1], linha[2]) for linha in linhas}
+
+
+def disciplinas_por_termo(conexao: sqlite3.Connection) -> dict[str, int]:
+    linhas = conexao.execute(
+        "SELECT t.termo, COUNT(DISTINCT d.disciplina)"
+        " FROM postings p"
+        " JOIN terms t ON t.id = p.term_id"
+        " JOIN documents d ON d.id = p.doc_id"
+        " GROUP BY p.term_id"
+    ).fetchall()
+    return dict(linhas)
+
+
+def contar_disciplinas(conexao: sqlite3.Connection) -> int:
+    return conexao.execute(
+        "SELECT COUNT(DISTINCT disciplina) FROM documents WHERE disciplina <> ''"
+    ).fetchone()[0]
+

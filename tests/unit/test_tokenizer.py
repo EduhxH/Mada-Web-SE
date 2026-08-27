@@ -40,3 +40,19 @@ def test_tokens_de_um_caractere_removidos():
 def test_stop_words_estao_normalizadas():
     for palavra in STOP_WORDS:
         assert palavra == remover_acentos(palavra.lower())
+
+
+def test_camelcase_e_separado():
+    assert tokenizar("FichaRevisoes") == ["ficha", "revisoes"]
+    assert tokenizar("GestCampeonato") == ["gest", "campeonato"]
+    assert tokenizar("PowerPoint") == ["power", "point"]
+
+
+def test_siglas_nao_sao_partidas():
+    assert tokenizar("PDF") == ["pdf"]
+    assert tokenizar("PSI9") == ["psi9"]
+    assert tokenizar("HTML") == ["html"]
+
+
+def test_camelcase_com_acentos():
+    assert tokenizar("PlanificaçãoModular") == ["planificacao", "modular"]

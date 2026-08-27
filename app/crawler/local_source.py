@@ -11,6 +11,8 @@ from bs4 import BeautifulSoup
 from pptx import Presentation
 from pypdf import PdfReader
 
+from urllib.parse import unquote, urlparse
+
 from app.indexing.tokenizer import remover_acentos
 from app.models.document import Documento
 
@@ -28,9 +30,17 @@ PASTAS_IGNORADAS = ("bin/", "obj/", ".vs/", "packages/", "__pycache__/")
 
 PADROES_PRIVADOS = ("notas", "pauta", "classifica")
 
+# Ficheiros do proprio sistema: segredos, codigos de acesso, bases de dados.
+# Nunca devem entrar no indice, aconteca o que acontecer ao caminho indicado.
+NOMES_PROIBIDOS = frozenset(
+    {"segredo.txt", "participantes.json", ".env", ".env.example"}
+)
+EXTENSOES_PROIBIDAS = {".sqlite3", ".sqlite", ".db", ".key", ".pem"}
+
 NOME_MANIFESTO = "_origens.json"
 
 MOTIVO_PRIVADO = "possivel dado pessoal"
+MOTIVO_SISTEMA = "ficheiro do sistema"
 MOTIVO_FORMATO = "formato nao suportado"
 MOTIVO_BUILD = "artefacto de build"
 MOTIVO_SEM_TEXTO = "sem texto extraivel"
@@ -94,6 +104,23 @@ def _ler_manifesto(pasta: Path) -> dict[str, str]:
     return dados if isinstance(dados, dict) else {}
 
 
+def titulo_de_url(url: str) -> str:
+    """Titulo legivel a partir do URL, em vez do nome do ficheiro guardado.
+
+    .../uploads/REGULAMENTO-INTERNO-APROVADO.pdf -> "REGULAMENTO INTERNO APROVADO"
+    """
+    caminho = unquote(urlparse(url).path).rstrip("/")
+    if not caminho:
+        return ""
+    nome = Path(caminho).name
+    for extensao in (".pdf", ".docx", ".pptx", ".html", ".htm"):
+        if nome.lower().endswith(extensao):
+            nome = nome[: -len(extensao)]
+            break
+    nome = nome.replace("-", " ").replace("_", " ")
+    return " ".join(nome.split())
+
+
 def _disciplina(raiz: Path, arquivo: Path) -> str:
     if not raiz.is_dir():
         return raiz.parent.name
@@ -122,6 +149,10 @@ def _processar(
 ) -> None:
     extensao = Path(nome).suffix.lower()
 
+    if nome.lower() in NOMES_PROIBIDOS or extensao in EXTENSOES_PROIBIDAS:
+        relatorio.ignorar(origem, MOTIVO_SISTEMA)
+        return
+
     if _e_privado(nome):
         relatorio.ignorar(origem, MOTIVO_PRIVADO)
         return
@@ -148,6 +179,8 @@ def _processar(
         return
 
     base = Path(nome).stem
+    if origem.startswith(("http://", "https://")):
+        base = titulo_de_url(origem) or base
     if extensao in EXTENSOES_HTML:
         origem = origem_declarada(dados) or origem
         base = titulo_html(dados) or base

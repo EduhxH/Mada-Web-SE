@@ -144,3 +144,26 @@ def disciplinas_filtradas(conexao: sqlite3.Connection):
         " GROUP BY disciplina ORDER BY 2 DESC",
         (EVENTO_BUSCA,),
     ).fetchall()
+
+
+def consultas_da_disciplina(
+    conexao: sqlite3.Connection, disciplina: str, limite: int = 6
+):
+    return conexao.execute(
+        "SELECT consulta, COUNT(*) FROM eventos"
+        " WHERE tipo = ? AND disciplina = ? AND resultados > 0 AND consulta <> ''"
+        " GROUP BY LOWER(consulta)"
+        " HAVING COUNT(DISTINCT participante) >= 2"
+        " ORDER BY 2 DESC LIMIT ?",
+        (EVENTO_BUSCA, disciplina, limite),
+    ).fetchall()
+
+
+def documentos_mais_abertos(conexao: sqlite3.Connection, limite: int = 40):
+    return conexao.execute(
+        "SELECT doc_id, COUNT(*) FROM eventos"
+        " WHERE tipo = ? AND doc_id IS NOT NULL"
+        " GROUP BY doc_id ORDER BY 2 DESC LIMIT ?",
+        (EVENTO_ABERTURA, limite),
+    ).fetchall()
+
