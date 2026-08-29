@@ -172,8 +172,6 @@ def test_so_apanha_ligacoes_da_regiao_de_conteudo():
 
 
 def test_ligacoes_de_ficheiro_apanha_pluginfile():
-    from bs4 import BeautifulSoup
-
     html = """
     <div>
       <a href="https://m/pluginfile.php/1/mod_folder/content/0/Ficha%203.pdf">
@@ -183,21 +181,52 @@ def test_ligacoes_de_ficheiro_apanha_pluginfile():
         Sebenta</a>
     </div>
     """
-    encontradas = moodle._ligacoes_de_ficheiro(BeautifulSoup(html, "html.parser"))
+    encontradas = moodle._ligacoes_de_ficheiro(html)
     assert len(encontradas) == 2
     assert encontradas[0][1] == "Ficha 3"
 
 
 def test_ligacoes_de_ficheiro_sem_duplicados():
-    from bs4 import BeautifulSoup
-
     html = """
     <div>
       <a href="https://m/pluginfile.php/1/a/Ficha.pdf">Ficha</a>
       <a href="https://m/pluginfile.php/1/a/Ficha.pdf">Ficha (icone)</a>
     </div>
     """
-    assert len(moodle._ligacoes_de_ficheiro(BeautifulSoup(html, "html.parser"))) == 1
+    assert len(moodle._ligacoes_de_ficheiro(html)) == 1
+
+
+def test_ligacoes_encontradas_no_json_embutido():
+    """O Moodle recente desenha a arvore de ficheiros por JavaScript: nao ha
+    <a> nenhum e os URLs so aparecem no JSON, com as barras escapadas."""
+    html = (
+        '<div id="folder_tree0"></div><script>'
+        'var d = {"children":[{"filename":"Sebenta F5.pdf",'
+        '"url":"https:\\/\\/m.pt\\/pluginfile.php\\/1\\/mod_folder'
+        '\\/content\\/0\\/Sebenta%20F5.pdf?forcedownload=1"}]};'
+        "</script>"
+    )
+    encontradas = moodle._ligacoes_de_ficheiro(html)
+    assert len(encontradas) == 1
+    endereco, titulo = encontradas[0]
+    assert endereco.startswith("https://m.pt/pluginfile.php/")
+    assert "\\" not in endereco
+    assert "forcedownload" not in endereco
+    assert titulo == "Sebenta F5"
+
+
+def test_json_embutido_ignorado_quando_ha_ligacoes_normais():
+    html = (
+        '<a href="https://m/pluginfile.php/1/a/Real.pdf">Real</a>'
+        '<script>{"url":"https:\\/\\/m\\/pluginfile.php\\/1\\/a\\/Outro.pdf"}</script>'
+    )
+    encontradas = moodle._ligacoes_de_ficheiro(html)
+    assert [t for _, t in encontradas] == ["Real"]
+
+
+def test_urls_sem_extensao_sao_descartados_no_json():
+    html = '<script>{"url":"https:\\/\\/m\\/pluginfile.php\\/1\\/a\\/sem_extensao"}</script>'
+    assert moodle._ligacoes_de_ficheiro(html) == []
 
 
 def test_nome_guardado_e_estavel_entre_execucoes():

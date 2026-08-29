@@ -257,10 +257,15 @@ def comando_moodle(
         print(f"Ignorados: {len(relatorio.ignorados)}")
         motivos: dict[str, int] = {}
         for _, motivo in relatorio.ignorados:
-            chave = motivo.split(":")[0]
+            # manter o motivo completo: 'folder: sem ficheiros' e
+            # 'folder: estado HTTP 404' sao problemas diferentes
+            chave = motivo[:44]
             motivos[chave] = motivos.get(chave, 0) + 1
         for motivo, quantos in sorted(motivos.items(), key=lambda p: -p[1]):
-            print(f"  {motivo:<40} {quantos:>4}")
+            print(f"  {motivo:<46} {quantos:>4}")
+        exemplos = [n for n, _ in relatorio.ignorados[:3]]
+        if exemplos:
+            print("  exemplos: " + ", ".join(e[:40] for e in exemplos))
 
     print()
     print("Agora indexe: python main.py atualizar --sem-rastreio")

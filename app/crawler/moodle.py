@@ -284,18 +284,46 @@ def _seguir_pluginfile(
     return None
 
 
-def _ligacoes_de_ficheiro(sopa) -> list[tuple[str, str]]:
-    """(url, nome) de cada pluginfile.php na pagina."""
-    encontradas = []
-    vistas = set()
+_PADRAO_PLUGINFILE = re.compile(
+    r"""https?://[^"'\s<>]*pluginfile\.php[^"'\s<>]*"""
+)
+
+
+def _ligacoes_de_ficheiro(html: str) -> list[tuple[str, str]]:
+    """(url, nome) de cada ficheiro da pagina de uma pasta.
+
+    Procura primeiro nas ligacoes <a>. O Moodle recente desenha a arvore de
+    ficheiros por JavaScript, a partir de um JSON embutido: nesse caso nao ha
+    <a> nenhum, e os URLs so aparecem no texto em bruto com as barras
+    escapadas. Desfaz-se o escape antes de procurar, para o padrao poder ser
+    simples.
+    """
+    sopa = BeautifulSoup(html, "html.parser")
+    encontradas: list[tuple[str, str]] = []
+    vistas: set[str] = set()
+
     for ligacao in sopa.find_all("a", href=True):
         endereco = ligacao["href"]
         if "pluginfile.php" not in endereco or endereco in vistas:
             continue
         vistas.add(endereco)
         nome = unquote(Path(urlparse(endereco).path).name)
-        texto = _limpar_titulo(ligacao.get_text(" ", strip=True))
-        encontradas.append((endereco, texto or nome))
+        rotulo = _limpar_titulo(ligacao.get_text(" ", strip=True))
+        encontradas.append((endereco, rotulo or nome))
+
+    if encontradas:
+        return encontradas
+
+    sem_escape = html.replace(chr(92) + "/", "/").replace(chr(92) + "u0026", "&")
+    for endereco in _PADRAO_PLUGINFILE.findall(sem_escape):
+        endereco = endereco.split("?forcedownload")[0]
+        if endereco in vistas:
+            continue
+        vistas.add(endereco)
+        nome = unquote(Path(urlparse(endereco).path).name)
+        if not nome or not Path(nome).suffix:
+            continue
+        encontradas.append((endereco, Path(nome).stem))
     return encontradas
 
 
@@ -352,7 +380,7 @@ def _descarregar_pasta(
         )
         return
 
-    ficheiros = _ligacoes_de_ficheiro(BeautifulSoup(pagina.text, "html.parser"))
+    ficheiros = _ligacoes_de_ficheiro(pagina.text)
     if not ficheiros:
         relatorio.ignorar(f"folder-{identificador}", "folder: sem ficheiros")
         return
