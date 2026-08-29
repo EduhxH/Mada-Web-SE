@@ -194,12 +194,20 @@ def comando_atualizar(
 
 
 def comando_moodle(
-    disciplinas: list[str] | None, intervalo: float, limite: int, listar: bool
+    disciplinas: list[str] | None, intervalo: float, limite: int,
+    listar: bool, diagnostico: bool = False,
 ) -> None:
     try:
         url_base, utilizador, _ = moodle.configuracao()
     except moodle.ErroMoodle as erro:
         print(erro)
+        return
+
+    if diagnostico:
+        try:
+            moodle.diagnosticar_pasta(Path("data") / "pagina-pasta.html")
+        except moodle.ErroMoodle as erro:
+            print(f"  {erro}")
         return
 
     print(f"A entrar em {url_base} como {utilizador}...")
@@ -247,6 +255,10 @@ def comando_moodle(
         f" ({relatorio.bytes_totais / 1024 / 1024:.1f} MB)"
         f" em {relatorio.pedidos} pedidos, {duracao:.0f}s"
     )
+    if relatorio.pastas_vazias:
+        print(
+            f"  ({relatorio.pastas_vazias} pastas estavam vazias no Moodle)"
+        )
     for nome, quantos in sorted(
         relatorio.disciplinas.items(), key=lambda p: -p[1]
     ):
@@ -414,6 +426,10 @@ def main() -> None:
         "--listar", action="store_true",
         help="so mostra as disciplinas inscritas, nao descarrega nada",
     )
+    p_moodle.add_argument(
+        "--diagnostico", action="store_true",
+        help="inspeciona a pagina de uma pasta e mostra a sua estrutura",
+    )
 
     argumentos = analisador.parse_args()
     if argumentos.comando == "indexar":
@@ -443,6 +459,7 @@ def main() -> None:
             argumentos.intervalo,
             argumentos.limite,
             argumentos.listar,
+            argumentos.diagnostico,
         )
     elif argumentos.comando == "atualizar":
         comando_atualizar(

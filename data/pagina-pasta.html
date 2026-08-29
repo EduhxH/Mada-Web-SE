@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html  dir="ltr" lang="pt" xml:lang="pt">
+<head>
+    <title>PSI9-Arquitetura de Computadores: Planificação</title>
+    <link rel="icon" href="//moodle.sefo.pt/pluginfile.php/1/theme_adaptable/favicon/1767980792/favicon.png" />
+
+    <link rel="stylesheet" href="https://moodle.sefo.pt/theme/adaptable/style/font-awesome.min.css">
+
+    <link href='https://fonts.googleapis.com/css?family=Hind:400,400i'
+    rel='stylesheet'
+    type='text/css'>
+
+    <link href='https://fonts.googleapis.com/css?family=Roboto+Slab:400,400i'
+    rel='stylesheet'
+    type='text/css'>
+
+    <link href='https://fonts.googleapis.com/css?family=Audiowide:400,400i'
+    rel='stylesheet'
+    type='text/css'>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="keywords" content="moodle, PSI9-Arquitetura de Computadores: Planificação" />
+<link rel="stylesheet" type="text/css" href="https://moodle.sefo.pt/theme/yui_combo.php?rollup/3.17.2/yui-moodlesimple-min.css" /><script id="firstthemesheet" type="text/css">/** Required in order to fix style inclusion problems in IE with YUI **/</script><link rel="stylesheet" type="text/css" href="https://moodle.sefo.pt/theme/styles.php/adaptable/1767980792/all" />
+<script type="text/javascript">
+//<![CDATA[
+var M = {}; M.yui = {};
+M.pageloadstarttime = new Date();
+M.cfg = {"wwwroot":"https:\/\/moodle.sefo.pt","sesskey":"DoFESTjjCE","themerev":"1767980792","slasharguments":1,"theme":"adaptable","iconsystemmodule":"core\/icon_system_standard","jsrev":-1,"admin":"admin","svgicons":true,"usertimezone":"Europe\/Lisbon","contextid":109862};var yui1ConfigFn = function(me) {if(/-skin|reset|fonts|grids|base/.test(me.name)){me.type='css';me.path=me.path.replace(/\.js/,'.css');me.path=me.path.replace(/\/yui2-skin/,'/assets/skins/sam/yui2-skin')}};
+var yui2ConfigFn = function(me) {var parts=me.name.replace(/^moodle-/,'').split('-'),component=parts.shift(),module=parts[0],min='-min';if(/-(skin|core)$/.test(me.name)){parts.pop();me.type='css';min=''}
+if(module){var filename=parts.join('-');me.path=component+'/'+module+'/'+filename+min+'.'+me.type}else{me.path=component+'/'+component+'.'+me.type}};
+YUI_config = {"debug":false,"base":"https:\/\/moodle.sefo.pt\/lib\/yuilib\/3.17.2\/","comboBase":"https:\/\/moodle.sefo.pt\/theme\/yui_combo.php?","combine":true,"filter":null,"insertBefore":"firstthemesheet","groups":{"yui2":{"base":"https:\/\/moodle.sefo.pt\/lib\/yuilib\/2in3\/2.9.0\/build\/","comboBase":"https:\/\/moodle.sefo.pt\/theme\/yui_combo.php?","combine":true,"ext":false,"root":"2in3\/2.9.0\/build\/","patterns":{"yui2-":{"group":"yui2","configFn":yui1ConfigFn}}},"moodle":{"name":"moodle","base":"https:\/\/moodle.sefo.pt\/theme\/yui_combo.php?m\/-1\/","combine":true,"comboBase":"https:\/\/moodle.sefo.pt\/theme\/yui_combo.php?","ext":false,"root":"m\/-1\/","patterns":{"moodle-":{"group":"moodle","configFn":yui2ConfigFn}},"filter":null,"modules":{"moodle-core-languninstallconfirm":{"requires":["base","node","moodle-core-notification-confirm","moodle-core-notification-alert"]},"moodle-core-chooserdialogue":{"requires":["base","panel","moodle-core-notification"]},"moodle-core-notification":{"requires":["moodle-core-notification-dialogue","moodle-core-notification-alert","moodle-core-notification-confirm","moodle-core-notification-exception","moodle-core-notification-ajaxexception"]},"moodle-core-notification-dialogue":{"requires":["base","node","panel","escape","event-key","dd-plugin","moodle-core-widget-focusafterclose","moodle-core-lockscroll"]},"moodle-core-notification-alert":{"requires":["moodle-core-notification-dialogue"]},"moodle-core-notification-confirm":{"requires":["moodle-core-notification-dialogue"]},"moodle-core-notification-exception":{"requires":["moodle-core-notification-dialogue"]},"moodle-core-notification-ajaxexception":{"requires":["moodle-core-notification-dialogue"]},"moodle-core-tooltip":{"requires":["base","node","io-base","moodle-core-notification-dialogue","json-parse","widget-position","widget-position-align","event-outside","cache-base"]},"moodle-core-checknet":{"requires":["base-base","moodle-core-notification-alert","io-base"]},"moodle-core-actionmenu":{"requires":["base","event","node-event-simulate"]},"moodle-core-dragdrop":{"requires":["base","node","io","dom","dd","event-key","event-focus","moodle-core-notification"]},"moodle-core-maintenancemodetimer":{"requires":["base","node"]},"moodle-core-popuphelp":{"requires":["moodle-core-tooltip"]},"moodle-core-formchangechecker":{"requires":["base","event-focus","moodle-core-event"]},"moodle-core-lockscroll":{"requires":["plugin","base-build"]},"moodle-core-handlebars":{"condition":{"trigger":"handlebars","when":"after"}},"moodle-core-dock":{"requires":["base","node","event-custom","event-mouseenter","event-resize","escape","moodle-core-dock-loader","moodle-core-event"]},"moodle-core-dock-loader":{"requires":["escape"]},"moodle-core-event":{"requires":["event-custom"]},"moodle-core-blocks":{"requires":["base","node","io","dom","dd","dd-scroll","moodle-core-dragdrop","moodle-core-notification"]},"moodle-core_availability-form":{"requires":["base","node","event","event-delegate","panel","moodle-core-notification-dialogue","json"]},"moodle-backup-backupselectall":{"requires":["node","event","node-event-simulate","anim"]},"moodle-backup-confirmcancel":{"requires":["node","node-event-simulate","moodle-core-notification-confirm"]},"moodle-course-dragdrop":{"requires":["base","node","io","dom","dd","dd-scroll","moodle-core-dragdrop","moodle-core-notification","moodle-course-coursebase","moodle-course-util"]},"moodle-course-categoryexpander":{"requires":["node","event-key"]},"moodle-course-formatchooser":{"requires":["base","node","node-event-simulate"]},"moodle-course-modchooser":{"requires":["moodle-core-chooserdialogue","moodle-course-coursebase"]},"moodle-course-util":{"requires":["node"],"use":["moodle-course-util-base"],"submodules":{"moodle-course-util-base":{},"moodle-course-util-section":{"requires":["node","moodle-course-util-base"]},"moodle-course-util-cm":{"requires":["node","moodle-course-util-base"]}}},"moodle-course-management":{"requires":["base","node","io-base","moodle-core-notification-exception","json-parse","dd-constrain","dd-proxy","dd-drop","dd-delegate","node-event-delegate"]},"moodle-form-dateselector":{"requires":["base","node","overlay","calendar"]},"moodle-form-shortforms":{"requires":["node","base","selector-css3","moodle-core-event"]},"moodle-form-showadvanced":{"requires":["node","base","selector-css3"]},"moodle-form-passwordunmask":{"requires":[]},"moodle-question-chooser":{"requires":["moodle-core-chooserdialogue"]},"moodle-question-preview":{"requires":["base","dom","event-delegate","event-key","core_question_engine"]},"moodle-question-searchform":{"requires":["base","node"]},"moodle-question-qbankmanager":{"requires":["node","selector-css3"]},"moodle-availability_completion-form":{"requires":["base","node","event","moodle-core_availability-form"]},"moodle-availability_date-form":{"requires":["base","node","event","io","moodle-core_availability-form"]},"moodle-availability_grade-form":{"requires":["base","node","event","moodle-core_availability-form"]},"moodle-availability_group-form":{"requires":["base","node","event","moodle-core_availability-form"]},"moodle-availability_grouping-form":{"requires":["base","node","event","moodle-core_availability-form"]},"moodle-availability_profile-form":{"requires":["base","node","event","moodle-core_availability-form"]},"moodle-qtype_ddimageortext-dd":{"requires":["node","dd","dd-drop","dd-constrain"]},"moodle-qtype_ddimageortext-form":{"requires":["moodle-qtype_ddimageortext-dd","form_filepicker"]},"moodle-qtype_ddmarker-dd":{"requires":["node","event-resize","dd","dd-drop","dd-constrain","graphics"]},"moodle-qtype_ddmarker-form":{"requires":["moodle-qtype_ddmarker-dd","form_filepicker","graphics","escape"]},"moodle-qtype_ddwtos-dd":{"requires":["node","dd","dd-drop","dd-constrain"]},"moodle-mod_assign-history":{"requires":["node","transition"]},"moodle-mod_forum-subscriptiontoggle":{"requires":["base-base","io-base"]},"moodle-mod_quiz-modform":{"requires":["base","node","event"]},"moodle-mod_quiz-dragdrop":{"requires":["base","node","io","dom","dd","dd-scroll","moodle-core-dragdrop","moodle-core-notification","moodle-mod_quiz-quizbase","moodle-mod_quiz-util-base","moodle-mod_quiz-util-page","moodle-mod_quiz-util-slot","moodle-course-util"]},"moodle-mod_quiz-repaginate":{"requires":["base","event","node","io","moodle-core-notification-dialogue"]},"moodle-mod_quiz-toolboxes":{"requires":["base","node","event","event-key","io","moodle-mod_quiz-quizbase","moodle-mod_quiz-util-slot","moodle-core-notification-ajaxexception"]},"moodle-mod_quiz-questionchooser":{"requires":["moodle-core-chooserdialogue","moodle-mod_quiz-util","querystring-parse"]},"moodle-mod_quiz-autosave":{"requires":["base","node","event","event-valuechange","node-event-delegate","io-form"]},"moodle-mod_quiz-quizquestionbank":{"requires":["base","event","node","io","io-form","yui-later","moodle-question-qbankmanager","moodle-core-notification-dialogue"]},"moodle-mod_quiz-randomquestion":{"requires":["base","event","node","io","moodle-core-notification-dialogue"]},"moodle-mod_quiz-quizbase":{"requires":["base","node"]},"moodle-mod_quiz-util":{"requires":["node","moodle-core-actionmenu"],"use":["moodle-mod_quiz-util-base"],"submodules":{"moodle-mod_quiz-util-base":{},"moodle-mod_quiz-util-slot":{"requires":["node","moodle-mod_quiz-util-base"]},"moodle-mod_quiz-util-page":{"requires":["node","moodle-mod_quiz-util-base"]}}},"moodle-message_airnotifier-toolboxes":{"requires":["base","node","io"]},"moodle-filter_glossary-autolinker":{"requires":["base","node","io-base","json-parse","event-delegate","overlay","moodle-core-event","moodle-core-notification-alert","moodle-core-notification-exception","moodle-core-notification-ajaxexception"]},"moodle-filter_mathjaxloader-loader":{"requires":["moodle-core-event"]},"moodle-editor_atto-rangy":{"requires":[]},"moodle-editor_atto-editor":{"requires":["node","transition","io","overlay","escape","event","event-simulate","event-custom","node-event-html5","node-event-simulate","yui-throttle","moodle-core-notification-dialogue","moodle-core-notification-confirm","moodle-editor_atto-rangy","handlebars","timers","querystring-stringify"]},"moodle-editor_atto-plugin":{"requires":["node","base","escape","event","event-outside","handlebars","event-custom","timers","moodle-editor_atto-menu"]},"moodle-editor_atto-menu":{"requires":["moodle-core-notification-dialogue","node","event","event-custom"]},"moodle-report_eventlist-eventfilter":{"requires":["base","event","node","node-event-delegate","datatable","autocomplete","autocomplete-filters"]},"moodle-report_loglive-fetchlogs":{"requires":["base","event","node","io","node-event-delegate"]},"moodle-gradereport_grader-gradereporttable":{"requires":["base","node","event","handlebars","overlay","event-hover"]},"moodle-gradereport_history-userselector":{"requires":["escape","event-delegate","event-key","handlebars","io-base","json-parse","moodle-core-notification-dialogue"]},"moodle-tool_capability-search":{"requires":["base","node"]},"moodle-tool_lp-dragdrop-reorder":{"requires":["moodle-core-dragdrop"]},"moodle-tool_monitor-dropdown":{"requires":["base","event","node"]},"moodle-assignfeedback_editpdf-editor":{"requires":["base","event","node","io","graphics","json","event-move","event-resize","transition","querystring-stringify-simple","moodle-core-notification-dialog","moodle-core-notification-alert","moodle-core-notification-exception","moodle-core-notification-ajaxexception"]},"moodle-atto_accessibilitychecker-button":{"requires":["color-base","moodle-editor_atto-plugin"]},"moodle-atto_accessibilityhelper-button":{"requires":["moodle-editor_atto-plugin"]},"moodle-atto_align-button":{"requires":["moodle-editor_atto-plugin"]},"moodle-atto_bold-button":{"requires":["moodle-editor_atto-plugin"]},"moodle-atto_charmap-button":{"requires":["moodle-editor_atto-plugin"]},"moodle-atto_clear-button":{"requires":["moodle-editor_atto-plugin"]},"moodle-atto_collapse-button":{"requires":["moodle-editor_atto-plugin"]},"moodle-atto_emoticon-button":{"requires":["moodle-editor_atto-plugin"]},"moodle-atto_equation-button":{"requires":["moodle-editor_atto-plugin","moodle-core-event","io","event-valuechange","tabview","array-extras"]},"moodle-atto_html-button":{"requires":["moodle-editor_atto-plugin","event-valuechange"]},"moodle-atto_image-button":{"requires":["moodle-editor_atto-plugin"]},"moodle-atto_indent-button":{"requires":["moodle-editor_atto-plugin"]},"moodle-atto_italic-button":{"requires":["moodle-editor_atto-plugin"]},"moodle-atto_link-button":{"requires":["moodle-editor_atto-plugin"]},"moodle-atto_managefiles-button":{"requires":["moodle-editor_atto-plugin"]},"moodle-atto_managefiles-usedfiles":{"requires":["node","escape"]},"moodle-atto_media-button":{"requires":["moodle-editor_atto-plugin","moodle-form-shortforms"]},"moodle-atto_noautolink-button":{"requires":["moodle-editor_atto-plugin"]},"moodle-atto_orderedlist-button":{"requires":["moodle-editor_atto-plugin"]},"moodle-atto_rtl-button":{"requires":["moodle-editor_atto-plugin"]},"moodle-atto_strike-button":{"requires":["moodle-editor_atto-plugin"]},"moodle-atto_subscript-button":{"requires":["moodle-editor_atto-plugin"]},"moodle-atto_superscript-button":{"requires":["moodle-editor_atto-plugin"]},"moodle-atto_table-button":{"requires":["moodle-editor_atto-plugin","moodle-editor_atto-menu","event","event-valuechange"]},"moodle-atto_title-button":{"requires":["moodle-editor_atto-plugin"]},"moodle-atto_underline-button":{"requires":["moodle-editor_atto-plugin"]},"moodle-atto_undo-button":{"requires":["moodle-editor_atto-plugin"]},"moodle-atto_unorderedlist-button":{"requires":["moodle-editor_atto-plugin"]}}},"gallery":{"name":"gallery","base":"https:\/\/moodle.sefo.pt\/lib\/yuilib\/gallery\/","combine":true,"comboBase":"https:\/\/moodle.sefo.pt\/theme\/yui_combo.php?","ext":false,"root":"gallery\/-1\/","patterns":{"gallery-":{"group":"gallery"}}}},"modules":{"core_filepicker":{"name":"core_filepicker","fullpath":"https:\/\/moodle.sefo.pt\/lib\/javascript.php\/-1\/repository\/filepicker.js","requires":["base","node","node-event-simulate","json","async-queue","io-base","io-upload-iframe","io-form","yui2-treeview","panel","cookie","datatable","datatable-sort","resize-plugin","dd-plugin","escape","moodle-core_filepicker","moodle-core-notification-dialogue"]},"core_comment":{"name":"core_comment","fullpath":"https:\/\/moodle.sefo.pt\/lib\/javascript.php\/-1\/comment\/comment.js","requires":["base","io-base","node","json","yui2-animation","overlay","escape"]},"mathjax":{"name":"mathjax","fullpath":"https:\/\/cdnjs.cloudflare.com\/ajax\/libs\/mathjax\/2.7.1\/MathJax.js?delayStartupUntil=configured"}}};
+M.yui.loader = {modules: {}};
+
+//]]>
+</script>
+
+<link rel="shortcut icon" href="http://moodle.sefo.pt/file.php/1/Imagens/Fundos/favicon.ico" />    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- Twitter Card data -->
+    <meta name="twitter:card" value="summary">
+    <meta name="twitter:site" value="Moodle // ESCO" />
+    <meta name="twitter:title" value="PSI9-Arquitetura de Computadores: Planificação" />
+
+    <!-- Open Graph data -->
+    <meta property="og:title" content="PSI9-Arquitetura de Computadores: Planificação" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://moodle.sefo.pt" />
+    <meta property="og:site_name" content="Moodle // ESCO" />
+
+    <!-- Chrome, Firefox OS and Opera on Android -->
+    <meta name="theme-color" content="#00a6d4" />
+
+    <!-- Windows Phone -->
+    <meta name="msapplication-navbutton-color" content="#00a6d4" />
+
+    <!-- iOS Safari -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="#00a6d4" />
+</head>
+
+<body  id="page-mod-folder-view" class="format-topics loginfailures  path-mod path-mod-folder dir-ltr lang-pt yui-skin-sam yui3-skin-sam moodle-sefo-pt pagelayout-incourse course-1304 context-109862 cmid-87607 category-153 two-column  has-region-side-post used-region-side-post side-post-only">
+
+<div class="skiplinks">
+    <a href="#maincontent" class="skip">Ir para o conteúdo principal</a>
+</div><script type="text/javascript" src="https://moodle.sefo.pt/theme/yui_combo.php?rollup/3.17.2/yui-moodlesimple-min.js"></script><script type="text/javascript" src="https://moodle.sefo.pt/theme/jquery.php/core/jquery-3.1.0.min.js"></script>
+<script type="text/javascript" src="https://moodle.sefo.pt/theme/jquery.php/theme_adaptable/pace-min.js"></script>
+<script type="text/javascript" src="https://moodle.sefo.pt/theme/jquery.php/theme_adaptable/jquery-flexslider-min.js"></script>
+<script type="text/javascript" src="https://moodle.sefo.pt/theme/jquery.php/theme_adaptable/tickerme.js"></script>
+<script type="text/javascript" src="https://moodle.sefo.pt/theme/jquery.php/theme_adaptable/jquery-easing-min.js"></script>
+<script type="text/javascript" src="https://moodle.sefo.pt/theme/jquery.php/theme_adaptable/adaptable.js"></script>
+<script type="text/javascript" src="https://moodle.sefo.pt/lib/javascript.php/-1/lib/javascript-static.js"></script>
+<script type="text/javascript">
+//<![CDATA[
+document.body.className += ' jsenabled';
+//]]>
+</script>
+
+
+<div id="page" class="container-fluid fullin showblockicons">
+
+    <header id="page-header-wrapper"  >
+    <div id="above-header">
+        <div class="clearfix container userhead">
+            <div class="pull-left">
+                <ul class="usermenu2 nav navbar-nav navbar-right"></ul>            </div>
+
+            <div class="headermenu row">
+        <div class="dropdown secondone">
+            <a class="dropdown-toggle usermendrop" data-toggle="dropdown">
+
+<img src="https://moodle.sefo.pt/theme/image.php/adaptable/core/1767980792/u/f1" alt="Foto de PSI9: Eduardo Carvalho" title="Foto de PSI9: Eduardo Carvalho" class="userpicture defaultuserpic" width="80" height="80" />PSI9: Eduardo Carvalho                <span class="fa fa-angle-down"></span>
+            </a>
+
+    <ul class="dropdown-menu usermen" role="menu">
+
+<li><a href="https://moodle.sefo.pt/my" title="Painel do utilizador"><i class="fa fa-dashboard"></i>Painel do utilizador</a></li><li><a href="https://moodle.sefo.pt/user/profile.php" title="Ver perfil"><i class="fa fa-user"></i>Ver perfil</a></li><li><a href="https://moodle.sefo.pt/user/edit.php" title="Editar perfil"><i class="fa fa-cog"></i>Editar perfil</a></li><li><a href="https://moodle.sefo.pt/user/preferences.php" title="Preferências"><i class="fa fa-cog"></i>Preferências</a></li><li><a href="https://moodle.sefo.pt/calendar/view.php" title="Calendário"><i class="fa fa-calendar"></i>Calendário</a></li><li><a href="https://moodle.sefo.pt/login/logout.php?sesskey=DoFESTjjCE" title="Sair"><i class="fa fa-sign-out"></i>Sair</a></li>
+    </ul>
+</div>
+</div>
+
+<div style="float: right; position: relative; display: inline; margin-left: 15px; height:20px;">
+<ul class="nav navbar-nav"><li class="dropdown langmenu"><a href="https://moodle.sefo.pt/mod/folder/view.php?id=87607" class="dropdown-toggle" data-toggle="dropdown" title="Idioma"><i class="fa fa-globe fa-lg"></i><span class="langdesc">Português - Portugal ‎(pt)‎</span></a><ul class="dropdown-menu"><li><a title="English ‎(en)‎" href="https://moodle.sefo.pt/mod/folder/view.php?id=87607&amp;lang=en">English ‎(en)‎</a></li><li><a title="Português - Portugal ‎(pt)‎" href="https://moodle.sefo.pt/mod/folder/view.php?id=87607&amp;lang=pt">Português - Portugal ‎(pt)‎</a></li><li><a title="नेपाली ‎(ne)‎" href="https://moodle.sefo.pt/mod/folder/view.php?id=87607&amp;lang=ne">नेपाली ‎(ne)‎</a></li></ul></ul></div>
+
+<div class="popover-region collapsed popover-region-messages"
+    id="nav-message-popover-container" data-userid="3498"
+    data-region="popover-region">
+    <div class="popover-region-toggle nav-link"
+        data-region="popover-region-toggle"
+        aria-role="button"
+        aria-controls="popover-region-container-6a9253febea8c6a9253feb9d4030"
+        aria-haspopup="true"
+        aria-label="Mostrar janela de mensagem sem novas mensagens"
+        tabindex="0">
+                <img class="icon " alt="Alternar o menu de mensagens" title="Alternar o menu de mensagens" src="https://moodle.sefo.pt/theme/image.php/adaptable/core/1767980792/t/message" />
+        <div class="count-container hidden" data-region="count-container"></div>
+
+    </div>
+    <div 
+        id="popover-region-container-6a9253febea8c6a9253feb9d4030"
+        class="popover-region-container"
+        data-region="popover-region-container"
+        aria-expanded="false"
+        aria-hidden="true"
+        aria-label="Janela da notificação"
+        role="region">
+        <div class="popover-region-header-container">
+            <h3 class="popover-region-header-text" data-region="popover-region-header-text">Mensagens</h3>
+            <div class="popover-region-header-actions" data-region="popover-region-header-actions">        <div class="newmessage-link">
+            <a href="https://moodle.sefo.pt/message/index.php?contactsfirst=1">Nova mensagem
+            </a>
+        </div>
+        <a class="mark-all-read-button"
+           href="#"
+           role="button"
+           title="Marcar todas como lidas"
+           data-action="mark-all-read">
+            <span class="normal-icon"><img class="icon " alt="Marcar todas como lidas" title="Marcar todas como lidas" src="https://moodle.sefo.pt/theme/image.php/adaptable/core/1767980792/t/markasread" /></span>
+            <span class="loading-icon"><img class="icon " alt="A carregar" title="A carregar" src="https://moodle.sefo.pt/theme/image.php/adaptable/core/1767980792/y/loading" /></span>
+        </a>
+        <a href="https://moodle.sefo.pt/message/edit.php?id=3498"
+           title="Preferências das mensagens">
+            <img class="icon " alt="Preferências das mensagens" title="Preferências das mensagens" src="https://moodle.sefo.pt/theme/image.php/adaptable/core/1767980792/i/settings" />
+        </a>
+</div>
+        </div>
+        <div class="popover-region-content-container" data-region="popover-region-content-container">
+            <div class="popover-region-content" data-region="popover-region-content">
+                        <div class="messages" data-region="messages" role="log" aria-busy="false" aria-atomic="false" aria-relevant="additions"></div>
+        <div class="empty-message" data-region="empty-message" tabindex="0">Sem mensagens</div>
+
+            </div>
+            <span class="loading-icon"><img class="icon " alt="A carregar" title="A carregar" src="https://moodle.sefo.pt/theme/image.php/adaptable/core/1767980792/y/loading" /></span>
+        </div>
+                <a class="see-all-link"
+                    href="https://moodle.sefo.pt/message/index.php">
+                    <div class="popover-region-footer-container">
+                        <div class="popover-region-seeall-text">Ver todas</div>
+                    </div>
+                </a>
+    </div>
+</div><div class="popover-region collapsed popover-region-notifications"
+    id="nav-notification-popover-container" data-userid="3498"
+    data-region="popover-region">
+    <div class="popover-region-toggle nav-link"
+        data-region="popover-region-toggle"
+        aria-role="button"
+        aria-controls="popover-region-container-6a9253febf6596a9253feb9d4031"
+        aria-haspopup="true"
+        aria-label="Mostrar janela de notificação sem novas notificações"
+        tabindex="0">
+                <img class="icon " alt="Alternar o menu de notificações" title="Alternar o menu de notificações" src="https://moodle.sefo.pt/theme/image.php/adaptable/core/1767980792/i/notifications" />
+        <div class="count-container hidden" data-region="count-container"></div>
+
+    </div>
+    <div 
+        id="popover-region-container-6a9253febf6596a9253feb9d4031"
+        class="popover-region-container"
+        data-region="popover-region-container"
+        aria-expanded="false"
+        aria-hidden="true"
+        aria-label="Janela da notificação"
+        role="region">
+        <div class="popover-region-header-container">
+            <h3 class="popover-region-header-text" data-region="popover-region-header-text">Notificações</h3>
+            <div class="popover-region-header-actions" data-region="popover-region-header-actions">        <a class="mark-all-read-button"
+           href="#"
+           title="Marcar todas como lidas"
+           data-action="mark-all-read"
+           role="button">
+            <span class="normal-icon"><img class="icon " alt="Marcar todas como lidas" title="Marcar todas como lidas" src="https://moodle.sefo.pt/theme/image.php/adaptable/core/1767980792/t/markasread" /></span>
+            <span class="loading-icon"><img class="icon " alt="A carregar" title="A carregar" src="https://moodle.sefo.pt/theme/image.php/adaptable/core/1767980792/y/loading" /></span>
+        </a>
+        <a href="https://moodle.sefo.pt/message/notificationpreferences.php?userid=3498"
+           title="Preferências das notificações">
+            <img class="icon " alt="Preferências das notificações" title="Preferências das notificações" src="https://moodle.sefo.pt/theme/image.php/adaptable/core/1767980792/i/settings" />
+        </a>
+</div>
+        </div>
+        <div class="popover-region-content-container" data-region="popover-region-content-container">
+            <div class="popover-region-content" data-region="popover-region-content">
+                        <div class="all-notifications"
+            data-region="all-notifications"
+            role="log"
+            aria-busy="false"
+            aria-atomic="false"
+            aria-relevant="additions"></div>
+        <div class="empty-message" tabindex="0" data-region="empty-message">Não tem notificações</div>
+
+            </div>
+            <span class="loading-icon"><img class="icon " alt="A carregar" title="A carregar" src="https://moodle.sefo.pt/theme/image.php/adaptable/core/1767980792/y/loading" /></span>
+        </div>
+                <a class="see-all-link"
+                    href="https://moodle.sefo.pt/message/output/popup/notifications.php">
+                    <div class="popover-region-footer-container">
+                        <div class="popover-region-seeall-text">Ver todas</div>
+                    </div>
+                </a>
+    </div>
+</div>    </div>
+</div>
+
+
+
+<div id="page-header" class="clearfix container">
+
+<div id="logocontainer"><a href='https://moodle.sefo.pt'><img src=//moodle.sefo.pt/pluginfile.php/1/theme_adaptable/logo/1767980792/logo_big_assinatura_branco.png alt="logo" id="logo" /></a></div><div id="sitetitle">PSI9-Arquitetura de Computadores</div>
+    <div class="socialbox pull-right">
+<div class="socialbox"><a target="_self" title="Search Moodle" href="https://moodle.sefo.pt/course/search.php"><i class="fa fa-search"></i></a><a target="_self" title="Facebook" href="https://www.facebook.com/ESCOTVedras/"><i class="fa fa-facebook-square"></i></a><a target="_self" title="Linkedin" href="https://www.linkedin.com/school/escotvedras/"><i class="fa fa-linkedin-square"></i></a><a target="_self" title="Twitter" href="https://twitter.com/ESCOTVedras"><i class="fa fa-twitter-square"></i></a><a target="_self" title="Instagram" href="https://instagram.com/ESCOTVedras/"><i class="fa fa-instagram"></i></a></div>    </div>
+
+
+        <div id="course-header">
+                    </div>
+    </div>
+
+
+    <div id="navwrap">
+        <div class="container">
+            <div class="navbar">
+                <nav role="navigation" class="navbar-inner">
+                    <div class="container-fluid">
+                        <a class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
+                            <span class="icon-bar"></span>
+                            <span class="icon-bar"></span>
+                            <span class="icon-bar"></span>
+                        </a>
+                        <div class="nav-collapse collapse ">
+                            <ul class="nav navbar-nav"><li><a title="" href="https://moodle.sefo.pt/?redirect=0"><i class="fa fa-home"></i> Início</a></li><li><a title="" href="https://moodle.sefo.pt/my/index.php"><i class="fa fa-dashboard"></i> Painel do utilizador</a></li><li><a title="" href="https://moodle.sefo.pt/calendar/view.php"><i class="fa fa-calendar"></i> Eventos</a></li><li class="dropdown"><a href="https://moodle.sefo.pt/my/index.php" class="dropdown-toggle" data-toggle="dropdown" title=""><i class="fa fa-briefcase"></i>Minhas Disciplinas</a><ul class="dropdown-menu"><li><a title="PSI9-Tecnologias de Informação e Comunicação" href="https://moodle.sefo.pt/course/view.php?id=1313">PSI9-Tecnologias de Informa...</a></li><li><a title="PSI9-Sistemas Operativos" href="https://moodle.sefo.pt/course/view.php?id=1312">PSI9-Sistemas Operativos</a></li><li><a title="PSI9-Redes de Comunicação" href="https://moodle.sefo.pt/course/view.php?id=1311">PSI9-Redes de Comunicação</a></li><li><a title="PSI9-Programação e Sistemas de Informação" href="https://moodle.sefo.pt/course/view.php?id=1310">PSI9-Programação e Sistemas...</a></li><li><a title="PSI9-Português" href="https://moodle.sefo.pt/course/view.php?id=1309">PSI9-Português</a></li><li><a title="PSI9-Matemática" href="https://moodle.sefo.pt/course/view.php?id=1308">PSI9-Matemática</a></li><li><a title="PSI9-Inglês" href="https://moodle.sefo.pt/course/view.php?id=1307">PSI9-Inglês</a></li><li><a title="PSI9-Física e Química" href="https://moodle.sefo.pt/course/view.php?id=1306">PSI9-Física e Química</a></li><li><a title="PSI9-Educação Física" href="https://moodle.sefo.pt/course/view.php?id=1305">PSI9-Educação Física</a></li><li><a title="PSI9-Arquitetura de Computadores" href="https://moodle.sefo.pt/course/view.php?id=1304">PSI9-Arquitetura de Computa...</a></li><li><a title="PSI9-Área de Integração" href="https://moodle.sefo.pt/course/view.php?id=1303">PSI9-Área de Integração</a></li><li><a title="Turma PSI9" href="https://moodle.sefo.pt/course/view.php?id=1268">Turma PSI9</a></li></ul><li class="dropdown"><a href="https://moodle.sefo.pt/mod/folder/view.php?id=87607" class="dropdown-toggle" data-toggle="dropdown" title=""><i class="fa fa-sitemap"></i><span class="menutitle">Disciplina atual</span></a><ul class="dropdown-menu"><li><a title="" href="https://moodle.sefo.pt/user/index.php?id=1304"><i class="fa fa-users"></i>Participantes</a></li><li><a title="" href="https://moodle.sefo.pt/grade/report/index.php?id=1304"><img class="icon icon" alt="" src="https://moodle.sefo.pt/theme/image.php/adaptable/core/1767980792/i/grades" />Pauta</a></li><li><a href="https://moodle.sefo.pt/mod/assign/index.php?id=1304"><img class="icon icon" alt="" src="https://moodle.sefo.pt/theme/image.php/adaptable/assign/1767980792/icon" />Avaliações</a></li><li><a href="https://moodle.sefo.pt/mod/forum/index.php?id=1304"><img class="icon icon" alt="" src="https://moodle.sefo.pt/theme/image.php/adaptable/forum/1767980792/icon" />Fóruns</a></li><li><a href="https://moodle.sefo.pt/course/resources.php?id=1304"><img class="icon icon" alt="" src="https://moodle.sefo.pt/theme/image.php/adaptable/mod_page/1767980792/icon" />Recursos</a></li><li><a href="https://moodle.sefo.pt/mod/quiz/index.php?id=1304"><img class="icon icon" alt="" src="https://moodle.sefo.pt/theme/image.php/adaptable/quiz/1767980792/icon" />Testes</a></li><li><a href="https://moodle.sefo.pt/mod/wiki/index.php?id=1304"><img class="icon icon" alt="" src="https://moodle.sefo.pt/theme/image.php/adaptable/wiki/1767980792/icon" />Wikis</a></li></ul></ul><ul class="nav navbar-nav"><li class="dropdown"><a href="#cm_submenu_4" class="dropdown-toggle" data-toggle="dropdown" title="Páginas SEFO">Páginas SEFO</a><ul class="dropdown-menu"><li><a title="SEFO" href="https://www.sefo.pt">SEFO</a></li><li><a title="eCommunity" href="https://escoalunos.sefo.pt/">eCommunity</a></li></ul><li class="dropdown"><a href="#cm_submenu_5" class="dropdown-toggle" data-toggle="dropdown" title="Oferta Formativa">Oferta Formativa</a><ul class="dropdown-menu"><li><a title="Ensino Profissional" href="https://www.sefo.pt/ensino-profissional/oferta-formativa/">Ensino Profissional</a></li><li><a title="Formação de Adultos" href="https://formacao.sefo.pt/">Formação de Adultos</a></li></ul><li class="dropdown"><a href="#cm_submenu_6" class="dropdown-toggle" data-toggle="dropdown" title="Professores">Professores</a><ul class="dropdown-menu"><li><a title=" Área de Professores" href="https://sefopt.sharepoint.com/sites/AreaProfessores/"> Área de Professores</a></li><li><a title="Gare" href="https://moodle.sefo.pt/auth/mnet/jump.php?hostid=4">Gare</a></li></ul><li class="dropdown"><a href="#cm_submenu_7" class="dropdown-toggle" data-toggle="dropdown" title="Alunos">Alunos</a><ul class="dropdown-menu"><li><a title="eCommunity" href="https://escoalunos.sefo.pt/">eCommunity</a></li><li><a title="Office 365" href="https://login.microsoftonline.com">Office 365</a></li><li><a title="Horário" href="https://moodle.sefo.pt/file.php/1/Documentos/horarios.pdf">Horário</a></li><li><a title=" Circulares" href="https://moodle.sefo.pt/mod/folder/view.php?id=2711"> Circulares</a></li><li><a title=" Questionários" href="https://moodle.sefo.pt/mod/page/view.php?id=34345"> Questionários</a></li><li><a title="Acesso Ensino Superior" href="https://www.dges.gov.pt/pt/sou_estudante">Acesso Ensino Superior</a></li><li><a title="Ementa" href="https://www.dropbox.com/s/ienz9erm5c7ystf/Ementa%20Refeit%C3%B3rio.pdf?dl=0">Ementa</a></li></ul></ul>
+        <ul class="nav pull-right">
+           <li class="hbl">
+               <a href="#" class="moodlezoom" title="Ocultar blocos">
+                   <i class="fa fa-indent fa-lg"></i>
+               <span class="zoomdesc">Ocultar blocos</span>
+           </a>
+       </li>
+       <li class="sbl">
+               <a href="#" class="moodlezoom" title="Mostrar blocos">
+               <i class="fa fa-outdent fa-lg"></i>
+               <span class="zoomdesc">Mostrar blocos</span>
+           </a>
+       </li>
+            <li class="hbll">
+                <a href="#" class="moodlewidth" title="Ecrã completo">
+                <i class="fa fa-expand fa-lg"></i>
+                <span class="zoomdesc">Ecrã completo</span>
+            </a>
+        </li>
+        <li class="sbll">
+                <a href="#" class="moodlewidth" title="Exibição padrão">
+                    <i class="fa fa-compress fa-lg"></i>
+                <span class="zoomdesc">Exibição padrão</span>
+            </a>
+            </li>
+        </ul>
+                            <div id="edittingbutton" class="pull-right breadcrumb-button">
+                                                            </div>
+                        </div>
+                    </div>
+                </nav>
+            </div>
+        </div>
+    </div>
+
+</header>
+
+
+<div class="container outercont">
+    <div id="page-content" class="row-fluid">
+        <div id="page-navbar" class="span12"><ul class="breadcrumb"><i title="Início" class="fa fa-folder-open-o fa-lg"></i><span class="separator"><i class="fa-angle-right fa"></i>
+                             </span><li><span tabindex="0">Minhas disciplinas</span></li><span class="separator"><i class="fa-angle-right fa"></i>
+                             </span><li><span itemscope="" itemtype="http://data-vocabulary.org/Breadcrumb"><a itemprop="url" title="PSI9-Arquitetura de Computadores" href="https://moodle.sefo.pt/course/view.php?id=1304"><span itemprop="title">PSI9-Arquitetura de Computadores</span></a></span></li><span class="separator"><i class="fa-angle-right fa"></i>
+                             </span><li><span itemscope="" itemtype="http://data-vocabulary.org/Breadcrumb"><a itemprop="url" href="https://moodle.sefo.pt/course/view.php?id=1304#section-3"><span itemprop="title">Módulo 1 - Sistemas Digitais</span></a></span></li><span class="separator"><i class="fa-angle-right fa"></i>
+                             </span><li><span itemscope="" itemtype="http://data-vocabulary.org/Breadcrumb"><a itemprop="url" title="Pasta" href="https://moodle.sefo.pt/mod/folder/view.php?id=87607"><span itemprop="title">Planificação</span></a></span></li></ul></div>
+        <section id="region-main" class="span9 desktop-first-column">
+            <span class="notifications" id="user-notifications"></span><div role="main"><span id="maincontent"></span><h2>Planificação</h2><div class="box generalbox foldertree"><div id="folder_tree0" class="filemanager"><ul><li><div class="fp-filename-icon"><span class="fp-icon"><img class="icon " alt="" src="https://moodle.sefo.pt/theme/image.php/adaptable/core/1767980792/f/folder-24" /></span><span class="fp-filename"></span></div></li></ul></div></div></div>        </section>
+
+        <aside id="block-region-side-post" class="span3 block-region" data-blockregion="side-post" data-droptarget="1"><a class="skip skip-block" id="fsb-1" href="#sb-1">Ignorar Menu principal</a><div id="inst1" class="block_site_main_menu  block list_block" role="complementary" data-block="site_main_menu" data-instanceid="1" aria-labelledby="instance-1-header" data-dockable="1"><div class="header"><div class="title"><div class="block_action"></div><h2 id="instance-1-header">Menu principal</h2></div></div><div class="content"><ul class="unlist"><li class="r0"><div class="column c1"><div class="main-menu-content"><div class="activity"><a class="" onclick="window.open(&#039;https://moodle.sefo.pt/mod/url/view.php?id=60113&amp;redirect=1&#039;, &#039;&#039;, &#039;width=620,height=450,toolbar=no,location=no,menubar=no,copyhistory=no,status=no,directories=no,scrollbars=yes,resizable=yes&#039;); return false;" href="https://moodle.sefo.pt/mod/url/view.php?id=60113"><img src="https://moodle.sefo.pt/theme/image.php/adaptable/url/1767980792/icon" class="iconlarge activityicon" alt=" " role="presentation" /><span class="instancename">OFERTA FORMATIVA<span class="accesshide " > Hiperligação</span></span></a></div></div></div></li>
+<li class="r1"><div class="column c1"><div class="main-menu-content"><div class="activity"><a class="" onclick="window.open(&#039;https://moodle.sefo.pt/mod/url/view.php?id=66346&amp;redirect=1&#039;, &#039;&#039;, &#039;width=620,height=450,toolbar=no,location=no,menubar=no,copyhistory=no,status=no,directories=no,scrollbars=yes,resizable=yes&#039;); return false;" href="https://moodle.sefo.pt/mod/url/view.php?id=66346"><img src="https://moodle.sefo.pt/theme/image.php/adaptable/url/1767980792/icon" class="iconlarge activityicon" alt=" " role="presentation" /><span class="instancename">REGULAMENTOS E DOCUMENTOS DE REFERÊNCIA<span class="accesshide " > Hiperligação</span></span></a></div></div></div></li>
+<li class="r0"><div class="column c1"><div class="main-menu-content"><div class="activity"><a class="" onclick="window.open(&#039;https://moodle.sefo.pt/mod/url/view.php?id=34344&amp;redirect=1&#039;, &#039;&#039;, &#039;width=620,height=450,toolbar=no,location=no,menubar=no,copyhistory=no,status=no,directories=no,scrollbars=yes,resizable=yes&#039;); return false;" href="https://moodle.sefo.pt/mod/url/view.php?id=34344"><img src="https://moodle.sefo.pt/theme/image.php/adaptable/url/1767980792/icon" class="iconlarge activityicon" alt=" " role="presentation" /><span class="instancename">Ementa Refeitório<span class="accesshide " > Hiperligação</span></span></a></div></div></div></li>
+<li class="r1"><div class="column c1"><div class="main-menu-content"><div class="activity"><a class="" onclick="" href="https://moodle.sefo.pt/mod/page/view.php?id=34345"><img src="https://moodle.sefo.pt/theme/image.php/adaptable/page/1767980792/icon" class="iconlarge activityicon" alt=" " role="presentation" /><span class="instancename">Questionários<span class="accesshide " > Página</span></span></a></div></div></div></li>
+<li class="r0"><div class="column c1"><div class="main-menu-content"><div class="activity"><a class="" onclick="" href="https://moodle.sefo.pt/mod/forum/view.php?id=988"><img src="https://moodle.sefo.pt/theme/image.php/adaptable/forum/1767980792/icon" class="iconlarge activityicon" alt=" " role="presentation" /><span class="instancename">Notícias<span class="accesshide " > Fórum</span></span></a></div></div></div></li></ul></div></div><span class="skip-block-to" id="sb-1"></span><a class="skip skip-block" id="fsb-2" href="#sb-2">Ignorar Navegação</a><div id="inst2621" class="block_navigation  block" role="navigation" data-block="navigation" data-instanceid="2621" aria-labelledby="instance-2621-header" data-dockable="1"><div class="header"><div class="title"><div class="block_action"></div><h2 id="instance-2621-header">Navegação</h2></div></div><div class="content"><ul class="block_tree list" role="tree" data-ajax-loader="block_navigation/nav_loader"><li class="type_unknown depth_1 contains_branch" aria-labelledby="label_1_1"><p class="tree_item branch navigation_node" role="treeitem" aria-expanded="true" aria-owns="random6a9253feb9d401_group" data-collapsible="false"><a tabindex="-1" id="label_1_1" href="https://moodle.sefo.pt/">Página principal</a></p><ul id="random6a9253feb9d401_group" role="group"><li class="type_setting depth_2 item_with_icon" aria-labelledby="label_2_2"><p class="tree_item hasicon" role="treeitem"><a tabindex="-1" id="label_2_2" href="https://moodle.sefo.pt/my/"><img class="icon navicon" alt="" src="https://moodle.sefo.pt/theme/image.php/adaptable/core/1767980792/i/navigationitem" /><span class="item-content-wrap">Painel do utilizador</span></a></p></li><li class="type_course depth_2 contains_branch" aria-labelledby="label_2_3"><p class="tree_item branch" role="treeitem" aria-expanded="false" aria-owns="random6a9253feb9d403_group"><span tabindex="-1" id="label_2_3" title="Moodle // ESCO">Páginas do site</span></p><ul id="random6a9253feb9d403_group" role="group" aria-hidden="true"><li class="type_unknown depth_3 item_with_icon" aria-labelledby="label_3_5"><p class="tree_item hasicon" role="treeitem"><a tabindex="-1" id="label_3_5" href="https://moodle.sefo.pt/blog/index.php"><img class="icon navicon" alt="" src="https://moodle.sefo.pt/theme/image.php/adaptable/core/1767980792/i/navigationitem" /><span class="item-content-wrap">Blogues do site</span></a></p></li><li class="type_custom depth_3 item_with_icon" aria-labelledby="label_3_6"><p class="tree_item hasicon" role="treeitem"><a tabindex="-1" id="label_3_6" href="https://moodle.sefo.pt/badges/view.php?type=1"><img class="icon navicon" alt="" src="https://moodle.sefo.pt/theme/image.php/adaptable/core/1767980792/i/navigationitem" /><span class="item-content-wrap">Medalhas do site</span></a></p></li><li class="type_setting depth_3 item_with_icon" aria-labelledby="label_3_7"><p class="tree_item hasicon" role="treeitem"><a tabindex="-1" id="label_3_7" href="https://moodle.sefo.pt/tag/search.php"><img class="icon navicon" alt="" src="https://moodle.sefo.pt/theme/image.php/adaptable/core/1767980792/i/navigationitem" /><span class="item-content-wrap">Palavras-chave</span></a></p></li><li class="type_custom depth_3 item_with_icon" aria-labelledby="label_3_8"><p class="tree_item hasicon" role="treeitem"><a tabindex="-1" id="label_3_8" href="https://moodle.sefo.pt/calendar/view.php?view=month"><img class="icon navicon" alt="" src="https://moodle.sefo.pt/theme/image.php/adaptable/core/1767980792/i/navigationitem" /><span class="item-content-wrap">Calendário</span></a></p></li><li class="type_activity depth_3 item_with_icon" aria-labelledby="label_3_10"><p class="tree_item hasicon" role="treeitem"><a href="https://moodle.sefo.pt/mod/url/view.php?id=60113" id="label_3_10" class=""  tabindex="-1"  title="Hiperligação" ><img class="icon navicon" alt="Hiperligação" title="Hiperligação" src="https://moodle.sefo.pt/theme/image.php/adaptable/url/1767980792/icon" /><span class="item-content-wrap">OFERTA FORMATIVA</span></a></p></li><li class="type_activity depth_3 item_with_icon" aria-labelledby="label_3_11"><p class="tree_item hasicon" role="treeitem"><a href="https://moodle.sefo.pt/mod/url/view.php?id=66346" id="label_3_11" class=""  tabindex="-1"  title="Hiperligação" ><img class="icon navicon" alt="Hiperligação" title="Hiperligação" src="https://moodle.sefo.pt/theme/image.php/adaptable/url/1767980792/icon" /><span class="item-content-wrap">REGULAMENTOS E DOCUMENTOS DE REFERÊNCIA</span></a></p></li><li class="type_activity depth_3 item_with_icon" aria-labelledby="label_3_13"><p class="tree_item hasicon" role="treeitem"><a href="https://moodle.sefo.pt/mod/url/view.php?id=34344" id="label_3_13" class=""  tabindex="-1"  title="Hiperligação" ><img class="icon navicon" alt="Hiperligação" title="Hiperligação" src="https://moodle.sefo.pt/theme/image.php/adaptable/url/1767980792/icon" /><span class="item-content-wrap">Ementa Refeitório</span></a></p></li><li class="type_activity depth_3 item_with_icon" aria-labelledby="label_3_14"><p class="tree_item hasicon" role="treeitem"><a tabindex="-1" id="label_3_14" title="Página" href="https://moodle.sefo.pt/mod/page/view.php?id=34345"><img class="icon navicon" alt="Página" title="Página" src="https://moodle.sefo.pt/theme/image.php/adaptable/page/1767980792/icon" /><span class="item-content-wrap">Questionários</span></a></p></li><li class="type_activity depth_3 item_with_icon" aria-labelledby="label_3_15"><p class="tree_item hasicon" role="treeitem"><a tabindex="-1" id="label_3_15" title="Fórum" href="https://moodle.sefo.pt/mod/forum/view.php?id=988"><img class="icon navicon" alt="Fórum" title="Fórum" src="https://moodle.sefo.pt/theme/image.php/adaptable/forum/1767980792/icon" /><span class="item-content-wrap">Notícias</span></a></p></li></ul></li><li class="type_system depth_2 contains_branch" aria-labelledby="label_2_18"><p class="tree_item branch canexpand" role="treeitem" aria-expanded="true" aria-owns="random6a9253feb9d4013_group"><span tabindex="-1" id="label_2_18">Minhas disciplinas</span></p><ul id="random6a9253feb9d4013_group" role="group"><li class="type_course depth_3 contains_branch" aria-labelledby="label_3_19"><p class="tree_item branch" role="treeitem" id="expandable_branch_20_1313" aria-expanded="false" data-requires-ajax="true" data-loaded="false" data-node-id="expandable_branch_20_1313" data-node-key="1313" data-node-type="20"><a tabindex="-1" id="label_3_19" title="PSI9-Tecnologias de Informação e Comunicação" href="https://moodle.sefo.pt/course/view.php?id=1313">PSI9-Tecnologias de Informação e Comunicação</a></p></li><li class="type_course depth_3 contains_branch" aria-labelledby="label_3_20"><p class="tree_item branch" role="treeitem" id="expandable_branch_20_1312" aria-expanded="false" data-requires-ajax="true" data-loaded="false" data-node-id="expandable_branch_20_1312" data-node-key="1312" data-node-type="20"><a tabindex="-1" id="label_3_20" title="PSI9-Sistemas Operativos" href="https://moodle.sefo.pt/course/view.php?id=1312">PSI9-Sistemas Operativos</a></p></li><li class="type_course depth_3 contains_branch" aria-labelledby="label_3_21"><p class="tree_item branch" role="treeitem" id="expandable_branch_20_1311" aria-expanded="false" data-requires-ajax="true" data-loaded="false" data-node-id="expandable_branch_20_1311" data-node-key="1311" data-node-type="20"><a tabindex="-1" id="label_3_21" title="PSI9-Redes de Comunicação" href="https://moodle.sefo.pt/course/view.php?id=1311">PSI9-Redes de Comunicação</a></p></li><li class="type_course depth_3 contains_branch" aria-labelledby="label_3_22"><p class="tree_item branch" role="treeitem" id="expandable_branch_20_1310" aria-expanded="false" data-requires-ajax="true" data-loaded="false" data-node-id="expandable_branch_20_1310" data-node-key="1310" data-node-type="20"><a tabindex="-1" id="label_3_22" title="PSI9-Programação e Sistemas de Informação" href="https://moodle.sefo.pt/course/view.php?id=1310">PSI9-Programação e Sistemas de Informação</a></p></li><li class="type_course depth_3 contains_branch" aria-labelledby="label_3_23"><p class="tree_item branch" role="treeitem" id="expandable_branch_20_1309" aria-expanded="false" data-requires-ajax="true" data-loaded="false" data-node-id="expandable_branch_20_1309" data-node-key="1309" data-node-type="20"><a tabindex="-1" id="label_3_23" title="PSI9-Português" href="https://moodle.sefo.pt/course/view.php?id=1309">PSI9-Português</a></p></li><li class="type_course depth_3 contains_branch" aria-labelledby="label_3_24"><p class="tree_item branch" role="treeitem" id="expandable_branch_20_1308" aria-expanded="false" data-requires-ajax="true" data-loaded="false" data-node-id="expandable_branch_20_1308" data-node-key="1308" data-node-type="20"><a tabindex="-1" id="label_3_24" title="PSI9-Matemática" href="https://moodle.sefo.pt/course/view.php?id=1308">PSI9-Matemática</a></p></li><li class="type_course depth_3 contains_branch" aria-labelledby="label_3_25"><p class="tree_item branch" role="treeitem" id="expandable_branch_20_1307" aria-expanded="false" data-requires-ajax="true" data-loaded="false" data-node-id="expandable_branch_20_1307" data-node-key="1307" data-node-type="20"><a tabindex="-1" id="label_3_25" title="PSI9-Inglês" href="https://moodle.sefo.pt/course/view.php?id=1307">PSI9-Inglês</a></p></li><li class="type_course depth_3 contains_branch" aria-labelledby="label_3_26"><p class="tree_item branch" role="treeitem" id="expandable_branch_20_1306" aria-expanded="false" data-requires-ajax="true" data-loaded="false" data-node-id="expandable_branch_20_1306" data-node-key="1306" data-node-type="20"><a tabindex="-1" id="label_3_26" title="PSI9-Física e Química" href="https://moodle.sefo.pt/course/view.php?id=1306">PSI9-Física e Química</a></p></li><li class="type_course depth_3 contains_branch" aria-labelledby="label_3_27"><p class="tree_item branch" role="treeitem" id="expandable_branch_20_1305" aria-expanded="false" data-requires-ajax="true" data-loaded="false" data-node-id="expandable_branch_20_1305" data-node-key="1305" data-node-type="20"><a tabindex="-1" id="label_3_27" title="PSI9-Educação Física" href="https://moodle.sefo.pt/course/view.php?id=1305">PSI9-Educação Física</a></p></li><li class="type_course depth_3 contains_branch" aria-labelledby="label_3_28"><p class="tree_item branch canexpand" role="treeitem" aria-expanded="true" aria-owns="random6a9253feb9d4014_group"><a tabindex="-1" id="label_3_28" title="PSI9-Arquitetura de Computadores" href="https://moodle.sefo.pt/course/view.php?id=1304">PSI9-Arquitetura de Computadores</a></p><ul id="random6a9253feb9d4014_group" role="group"><li class="type_unknown depth_4 contains_branch" aria-labelledby="label_4_29"><p class="tree_item branch" role="treeitem" aria-expanded="false" aria-owns="random6a9253feb9d4015_group"><a tabindex="-1" id="label_4_29" href="https://moodle.sefo.pt/user/index.php?id=1304">Participantes</a></p><ul id="random6a9253feb9d4015_group" role="group" aria-hidden="true"><li class="type_setting depth_5 item_with_icon" aria-labelledby="label_5_30"><p class="tree_item hasicon" role="treeitem"><a tabindex="-1" id="label_5_30" href="https://moodle.sefo.pt/blog/index.php?courseid=1304"><img class="icon navicon" alt="" src="https://moodle.sefo.pt/theme/image.php/adaptable/core/1767980792/i/navigationitem" /><span class="item-content-wrap">Blogues da disciplina</span></a></p></li><li class="type_user depth_5 item_with_icon" aria-labelledby="label_5_31"><p class="tree_item hasicon" role="treeitem"><a tabindex="-1" id="label_5_31" href="https://moodle.sefo.pt/user/view.php?id=3498&amp;course=1304"><img class="icon navicon" alt="" src="https://moodle.sefo.pt/theme/image.php/adaptable/core/1767980792/i/navigationitem" /><span class="item-content-wrap">PSI9: Eduardo Carvalho</span></a></p></li></ul></li><li class="type_setting depth_4 item_with_icon" aria-labelledby="label_4_32"><p class="tree_item hasicon" role="treeitem"><a tabindex="-1" id="label_4_32" href="https://moodle.sefo.pt/badges/view.php?type=2&amp;id=1304"><img class="icon navicon" alt="Medalhas" title="Medalhas" src="https://moodle.sefo.pt/theme/image.php/adaptable/core/1767980792/i/badge" /><span class="item-content-wrap">Medalhas</span></a></p></li><li class="type_setting depth_4 item_with_icon" aria-labelledby="label_4_33"><p class="tree_item hasicon" role="treeitem"><a tabindex="-1" id="label_4_33" href="https://moodle.sefo.pt/admin/tool/lp/coursecompetencies.php?courseid=1304"><img class="icon navicon" alt="" src="https://moodle.sefo.pt/theme/image.php/adaptable/core/1767980792/i/competencies" /><span class="item-content-wrap">Competências</span></a></p></li><li class="type_setting depth_4 item_with_icon" aria-labelledby="label_4_34"><p class="tree_item hasicon" role="treeitem"><a tabindex="-1" id="label_4_34" href="https://moodle.sefo.pt/grade/report/index.php?id=1304"><img class="icon navicon" alt="" src="https://moodle.sefo.pt/theme/image.php/adaptable/core/1767980792/i/grades" /><span class="item-content-wrap">Pauta</span></a></p></li><li class="type_structure depth_4 contains_branch" aria-labelledby="label_4_35"><p class="tree_item branch" role="treeitem" id="expandable_branch_30_12232" aria-expanded="false" data-requires-ajax="true" data-loaded="false" data-node-id="expandable_branch_30_12232" data-node-key="12232" data-node-type="30"><a tabindex="-1" id="label_4_35" href="https://moodle.sefo.pt/course/view.php?id=1304#section-0">Geral</a></p></li><li class="type_structure depth_4 contains_branch" aria-labelledby="label_4_36"><p class="tree_item branch" role="treeitem" id="expandable_branch_30_12234" aria-expanded="false" data-requires-ajax="true" data-loaded="false" data-node-id="expandable_branch_30_12234" data-node-key="12234" data-node-type="30"><a tabindex="-1" id="label_4_36" href="https://moodle.sefo.pt/course/view.php?id=1304#section-1">Módulo 2: Montagem e configuração de computadores</a></p></li><li class="type_structure depth_4 contains_branch" aria-labelledby="label_4_37"><p class="tree_item branch" role="treeitem" id="expandable_branch_30_12235" aria-expanded="false" data-requires-ajax="true" data-loaded="false" data-node-id="expandable_branch_30_12235" data-node-key="12235" data-node-type="30"><a tabindex="-1" id="label_4_37" href="https://moodle.sefo.pt/course/view.php?id=1304#section-2">Módulo 3: Técnicas de Detecção de Avarias</a></p></li><li class="type_structure depth_4 contains_branch" aria-labelledby="label_4_38"><p class="tree_item branch" role="treeitem" aria-expanded="true" aria-owns="random6a9253feb9d4021_group"><a tabindex="-1" id="label_4_38" href="https://moodle.sefo.pt/course/view.php?id=1304#section-3">Módulo 1 - Sistemas Digitais</a></p><ul id="random6a9253feb9d4021_group" role="group"><li class="type_activity depth_5 item_with_icon" aria-labelledby="label_5_39"><p class="tree_item hasicon" role="treeitem"><a tabindex="-1" id="label_5_39" title="Avaliação" href="https://moodle.sefo.pt/mod/assign/view.php?id=86860"><img class="icon navicon" alt="Avaliação" title="Avaliação" src="https://moodle.sefo.pt/theme/image.php/adaptable/assign/1767980792/icon" /><span class="item-content-wrap">Enviar Trabalho Processador i9</span></a></p></li><li class="type_activity depth_5 item_with_icon" aria-labelledby="label_5_40"><p class="tree_item hasicon" role="treeitem"><a tabindex="-1" id="label_5_40" title="Avaliação" href="https://moodle.sefo.pt/mod/assign/view.php?id=86988"><img class="icon navicon" alt="Avaliação" title="Avaliação" src="https://moodle.sefo.pt/theme/image.php/adaptable/assign/1767980792/icon" /><span class="item-content-wrap">Folheto Dia Aberto</span></a></p></li><li class="type_activity depth_5 item_with_icon" aria-labelledby="label_5_41"><p class="tree_item hasicon" role="treeitem"><a tabindex="-1" id="label_5_41" title="Avaliação" href="https://moodle.sefo.pt/mod/assign/view.php?id=87013"><img class="icon navicon" alt="Avaliação" title="Avaliação" src="https://moodle.sefo.pt/theme/image.php/adaptable/assign/1767980792/icon" /><span class="item-content-wrap">Orçamentos Lojas</span></a></p></li><li class="type_activity depth_5 item_with_icon" aria-labelledby="label_5_42"><p class="tree_item hasicon" role="treeitem"><a tabindex="-1" id="label_5_42" title="Avaliação" href="https://moodle.sefo.pt/mod/assign/view.php?id=87088"><img class="icon navicon" alt="Avaliação" title="Avaliação" src="https://moodle.sefo.pt/theme/image.php/adaptable/assign/1767980792/icon" /><span class="item-content-wrap">Atividade Kit Inventores</span></a></p></li><li class="type_activity depth_5 item_with_icon" aria-labelledby="label_5_43"><p class="tree_item hasicon" role="treeitem"><a tabindex="-1" id="label_5_43" title="Avaliação" href="https://moodle.sefo.pt/mod/assign/view.php?id=87269"><img class="icon navicon" alt="Avaliação" title="Avaliação" src="https://moodle.sefo.pt/theme/image.php/adaptable/assign/1767980792/icon" /><span class="item-content-wrap">Óbidos Gamming</span></a></p></li><li class="type_activity depth_5 item_with_icon current_branch" aria-labelledby="label_5_45"><p class="tree_item hasicon active_tree_node" role="treeitem"><a tabindex="-1" id="label_5_45" title="Pasta" href="https://moodle.sefo.pt/mod/folder/view.php?id=87607"><img class="icon navicon" alt="Pasta" title="Pasta" src="https://moodle.sefo.pt/theme/image.php/adaptable/folder/1767980792/icon" /><span class="item-content-wrap">Planificação</span></a></p></li></ul></li></ul></li><li class="type_custom depth_3 item_with_icon" aria-labelledby="label_3_46"><p class="tree_item hasicon" role="treeitem"><a tabindex="-1" id="label_3_46" href="https://moodle.sefo.pt/course/index.php#"><img class="icon navicon" alt="" src="https://moodle.sefo.pt/theme/image.php/adaptable/core/1767980792/i/navigationitem" /><span class="item-content-wrap">Mais...</span></a></p></li></ul></li></ul></li></ul></div></div><span class="skip-block-to" id="sb-2"></span></aside>    </div>
+</div>
+
+
+<footer id="page-footer">
+
+<div id="course-footer"></div>
+                <div class="container blockplace1"><div class="row-fluid"><div class="left-col span4"><h3>Contactos:</h3><i class="fa fa-building"></i>&nbsp; <b>SEFO </b>- Soc. Educação e Formação do Oeste, Lda<br>
+<span style="margin-left: 20px;">Rua da Liberdade, N.º4 - Hilarião</span><br><span style="margin-left: 20px;">2560-374 Torres Vedras</span><br><br>
+<i class="fa fa-phone"></i>&nbsp; &nbsp;261 339 920<span> <span style="">(Chamada para Rede Fixa Nacional)</span></span>&nbsp;<p><b>Secretaria</b>: 918 208 951&nbsp;(Chamada para Rede Móvel Nacional)<br>
+<i class="fa fa-envelope"></i>&nbsp; in&#102;o@&#115;&#101;&#102;&#111;&#46;&#112;t</p><p></p><p></p></div><div class="left-col span4"><h3>Localização:</h3><p></p><p style="text-align: left;"><b>Coordenadas GPS</b>: 39.105188, -9.264929<br></p><iframe src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3096.0827070460505!2d-9.26666768491035!3d39.10458714231019!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0xd1f2defaa975585%3A0xed4df3bf3f4816c8!2sESCO!5e0!3m2!1spt-PT!2spt!4v1547049835897" width="350" height="200" frameborder="0" style="border:0" allowfullscreen=""></iframe></div><div class="left-col span4"><h3>Links Úteis:</h3><p><b><a href="http://www.sefo.pt/" target="_blank">Sefo</a></b></p><p><a href="https://www.dges.gov.pt/pt/sou_estudante" target="_blank"><b>Acesso ao Ensino Superior</b></a></p></div></div></div>    <div class="info container2 clearfix">
+        <div class="container">
+            <div class="row-fluid">
+                <div class="span8">
+<p style="text-align: left;"><b><img src="https://www.dropbox.com/scl/fi/05vyh5701z2jscsobr04v/Rodap.png?rlkey=0bzkqynboiqh60elvsw9sr4x9&amp;raw=1" alt="Barra de Rodapé" width="3992" height="369" class="img-responsive atto_image_button_text-bottom"><br></b></p>                </div>
+
+                <div class="span4">
+                                    </div>
+            </div>
+        </div>
+    </div>
+</footer>
+
+
+<a class="back-to-top" href="#top" ><i class="fa fa-angle-up "></i></a>
+
+
+<script type="text/javascript">
+//<![CDATA[
+var require = {
+    baseUrl : 'https://moodle.sefo.pt/lib/requirejs.php/-1/',
+    // We only support AMD modules with an explicit define() statement.
+    enforceDefine: true,
+    skipDataMain: true,
+    waitSeconds : 0,
+
+    paths: {
+        jquery: 'https://moodle.sefo.pt/lib/javascript.php/-1/lib/jquery/jquery-3.1.0.min',
+        jqueryui: 'https://moodle.sefo.pt/lib/javascript.php/-1/lib/jquery/ui-1.12.1/jquery-ui.min',
+        jqueryprivate: 'https://moodle.sefo.pt/lib/javascript.php/-1/lib/requirejs/jquery-private'
+    },
+
+    // Custom jquery config map.
+    map: {
+      // '*' means all modules will get 'jqueryprivate'
+      // for their 'jquery' dependency.
+      '*': { jquery: 'jqueryprivate' },
+
+      // 'jquery-private' wants the real jQuery module
+      // though. If this line was not here, there would
+      // be an unresolvable cyclic dependency.
+      jqueryprivate: { jquery: 'jquery' }
+    }
+};
+
+//]]>
+</script>
+<script type="text/javascript" src="https://moodle.sefo.pt/lib/javascript.php/-1/lib/requirejs/require.min.js"></script>
+<script type="text/javascript">
+//<![CDATA[
+require(['core/first'], function() {
+;
+require(["media_videojs/loader"], function(loader) {
+    loader.setUp(function(videojs) {
+        videojs.options.flash.swf = "https://moodle.sefo.pt/media/player/videojs/videojs/video-js.swf";
+videojs.addLanguage("pt-BR",{
+ "Play": "Tocar",
+ "Pause": "Pausar",
+ "Current Time": "Tempo",
+ "Duration Time": "Duração",
+ "Remaining Time": "Tempo Restante",
+ "Stream Type": "Tipo de Stream",
+ "LIVE": "AO VIVO",
+ "Loaded": "Carregado",
+ "Progress": "Progresso",
+ "Fullscreen": "Tela Cheia",
+ "Non-Fullscreen": "Tela Normal",
+ "Mute": "Mudo",
+ "Unmute": "Habilitar Som",
+ "Playback Rate": "Velocidade",
+ "Subtitles": "Legendas",
+ "subtitles off": "Sem Legendas",
+ "Captions": "Anotações",
+ "captions off": "Sem Anotações",
+ "Chapters": "Capítulos",
+ "You aborted the media playback": "Você parou a execução do vídeo.",
+ "A network error caused the media download to fail part-way.": "Um erro na rede fez o vídeo parar parcialmente.",
+ "The media could not be loaded, either because the server or network failed or because the format is not supported.": "O vídeo não pode ser carregado, ou porque houve um problema com sua rede ou pelo formato do vídeo não ser suportado.",
+ "The media playback was aborted due to a corruption problem or because the media used features your browser did not support.": "A execução foi interrompida por um problema com o vídeo ou por seu navegador não dar suporte ao seu formato.",
+ "No compatible source was found for this media.": "Não foi encontrada fonte de vídeo compatível."
+});
+
+    });
+});;
+require(["theme_adaptable/bsoptions"], function(amd) { amd.init(false); });;
+function legacy_activity_onclick_handler_1(e) { e.halt(); window.open('https://moodle.sefo.pt/mod/url/view.php?id=60113&redirect=1', '', 'width=620,height=450,toolbar=no,location=no,menubar=no,copyhistory=no,status=no,directories=no,scrollbars=yes,resizable=yes'); return false; };
+function legacy_activity_onclick_handler_2(e) { e.halt(); window.open('https://moodle.sefo.pt/mod/url/view.php?id=66346&redirect=1', '', 'width=620,height=450,toolbar=no,location=no,menubar=no,copyhistory=no,status=no,directories=no,scrollbars=yes,resizable=yes'); return false; };
+function legacy_activity_onclick_handler_3(e) { e.halt(); window.open('https://moodle.sefo.pt/mod/url/view.php?id=34344&redirect=1', '', 'width=620,height=450,toolbar=no,location=no,menubar=no,copyhistory=no,status=no,directories=no,scrollbars=yes,resizable=yes'); return false; };
+
+    require(['core/yui'], function(Y) {
+            Y.on('click', legacy_activity_onclick_handler_1, '#label_3_10', null);
+    });
+;
+
+    require(['core/yui'], function(Y) {
+            Y.on('click', legacy_activity_onclick_handler_2, '#label_3_11', null);
+    });
+;
+
+    require(['core/yui'], function(Y) {
+            Y.on('click', legacy_activity_onclick_handler_3, '#label_3_13', null);
+    });
+;
+require(["block_navigation/navblock"], function(amd) { amd.init("2621"); });;
+require(["block_settings/settingsblock"], function(amd) { amd.init("2622", null); });;
+
+require(['core/yui'], function(Y) {
+    M.util.init_skiplink(Y);
+});
+;
+
+require(['jquery', 'message_popup/message_popover_controller'], function($, controller) {
+    var container = $('#nav-message-popover-container');
+    var controller = new controller(container);
+    controller.registerEventListeners();
+    controller.registerListNavigationEventListeners();
+});
+;
+
+require(['jquery', 'message_popup/notification_popover_controller'], function($, controller) {
+    var container = $('#nav-notification-popover-container');
+    var controller = new controller(container);
+    controller.registerEventListeners();
+    controller.registerListNavigationEventListeners();
+});
+;
+require(["core/log"], function(amd) { amd.setConfig({"level":"warn"}); });
+});
+//]]>
+</script>
+<script type="text/javascript">
+//<![CDATA[
+M.yui.add_module({"mod_folder":{"name":"mod_folder","fullpath":"https:\/\/moodle.sefo.pt\/lib\/javascript.php\/-1\/mod\/folder\/module.js","requires":[]}});
+
+//]]>
+</script>
+<script type="text/javascript" src="https://moodle.sefo.pt/theme/javascript.php/adaptable/1767980792/footer"></script>
+<script type="text/javascript">
+//<![CDATA[
+M.str = {"moodle":{"lastmodified":"\u00daltima altera\u00e7\u00e3o","name":"Designa\u00e7\u00e3o","error":"Erro","info":"Informa\u00e7\u00e3o","yes":"Sim","no":"N\u00e3o","viewallcourses":"Ver todas as disciplinas","cancel":"Cancelar","confirm":"Confirmar","areyousure":"Tem a certeza?","closebuttontitle":"Fechar","unknownerror":"Erro desconhecido"},"repository":{"type":"Tipo","size":"Tamanho","invalidjson":"String JSON inv\u00e1lida","nofilesattached":"Sem ficheiros selecionados","filepicker":"Gestor de ficheiros","logout":"Sair","nofilesavailable":"N\u00e3o h\u00e1 ficheiros dispon\u00edveis","norepositoriesavailable":"Nenhum dos seus reposit\u00f3rios atuais pode devolver ficheiros no formato indicado.","fileexistsdialogheader":"Ficheiro j\u00e1 existente","fileexistsdialog_editor":"Um ficheiro com esse nome j\u00e1 se encontra anexo ao texto que est\u00e1 a editar.","fileexistsdialog_filemanager":"Um ficheiro com esse nome j\u00e1 se encontra anexo","renameto":"Renomear para \"{$a}\"","referencesexist":"Existem {$a} atalhos de ficheiros que usam este ficheiro como origem","select":"Selecionar"},"admin":{"confirmdeletecomments":"Tem a certeza de que pretende apagar coment\u00e1rios?","confirmation":"Confirma\u00e7\u00e3o"},"block":{"addtodock":"Mover para a consola","undockitem":"Retirar este elemento da consola","dockblock":"Mover o bloco {$a} para a consola","undockblock":"Retirar o bloco {$a} da consola","undockall":"Retirar todos da consola","hidedockpanel":"Ocultar a consola","hidepanel":"Ocultar o painel"},"langconfig":{"thisdirectionvertical":"btt"}};
+//]]>
+</script>
+<script type="text/javascript">
+//<![CDATA[
+(function() {Y.use("moodle-core-dock-loader",function() {M.core.dock.loader.initLoader();
+});
+Y.use("moodle-filter_mathjaxloader-loader",function() {M.filter_mathjaxloader.configure({"mathjaxconfig":"MathJax.Hub.Config({\r\n    config: [\"Accessible.js\", \"Safe.js\"],\r\n    errorSettings: { message: [\"!\"] },\r\n    skipStartupTypeset: true,\r\n    messageStyle: \"none\"\r\n});\r\n","lang":"pt"});
+});
+M.util.help_popups.setup(Y);
+M.util.init_block_hider(Y, {"id":"inst1","title":"Menu principal","preference":"block1hidden","tooltipVisible":"Ocultar bloco Menu principal","tooltipHidden":"Mostrar bloco Menu principal"});
+M.util.init_block_hider(Y, {"id":"inst2621","title":"Navega\u00e7\u00e3o","preference":"block2621hidden","tooltipVisible":"Ocultar bloco Navega\u00e7\u00e3o","tooltipHidden":"Mostrar bloco Navega\u00e7\u00e3o"});
+ M.util.js_pending('random6a9253feb9d4034'); Y.use('mod_folder', function(Y) { M.mod_folder.init_tree(Y, "folder_tree0", false);  M.util.js_complete('random6a9253feb9d4034'); });
+ M.util.js_pending('random6a9253feb9d4035'); Y.on('domready', function() { M.util.js_complete("init");  M.util.js_complete('random6a9253feb9d4035'); });
+})();
+//]]>
+</script>
+
+</div>
+</body>
+</html>

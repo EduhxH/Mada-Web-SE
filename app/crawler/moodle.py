@@ -58,6 +58,7 @@ class RelatorioMoodle:
     ficheiros: int = 0
     bytes_totais: int = 0
     pedidos: int = 0
+    pastas_vazias: int = 0
     ignorados: list[tuple[str, str]] = field(default_factory=list)
 
     def ignorar(self, nome: str, motivo: str) -> None:
@@ -382,7 +383,8 @@ def _descarregar_pasta(
 
     ficheiros = _ligacoes_de_ficheiro(pagina.text)
     if not ficheiros:
-        relatorio.ignorar(f"folder-{identificador}", "folder: sem ficheiros")
+        # Uma pasta vazia no Moodle nao e uma falha nossa.
+        relatorio.pastas_vazias += 1
         return
 
     for endereco, titulo in ficheiros:
@@ -558,3 +560,54 @@ def sincronizar(
             _escrever_manifesto(pasta, origens)
 
     return relatorio
+
+
+def diagnosticar_pasta(guardar_em: Path | None = None, quantas: int = 6) -> None:
+    """Inspeciona varias pastas reais e diz quantos ficheiros cada uma tem.
+
+    Existe porque adivinhar a estrutura do HTML do Moodle custa uma execucao
+    de 7 minutos por tentativa.
+    """
+    url_base, utilizador, senha = configuracao()
+    sessao = iniciar_sessao(url_base, utilizador, senha)
+    print(f"Sessao iniciada como {utilizador}.")
+    print()
+
+    vistas = 0
+    com_conteudo = 0
+    for identificador, nome in listar_disciplinas(sessao, url_base):
+        _, recursos = pagina_da_disciplina(sessao, url_base, identificador)
+        for modulo, recurso, titulo in recursos:
+            if modulo != "folder" or vistas >= quantas:
+                continue
+            vistas += 1
+            publico = f"{url_base}/mod/folder/view.php?id={recurso}"
+            pagina = sessao.get(publico, timeout=TEMPO_LIMITE)
+            html = pagina.text
+
+            ficheiros = _ligacoes_de_ficheiro(html)
+            nomes_vazios = html.count('<span class="fp-filename"></span>')
+            nomes_cheios = html.count('class="fp-filename">') - nomes_vazios
+            if ficheiros:
+                com_conteudo += 1
+
+            print(f"{nome[:26]:<28} {titulo[:26]:<28} id {recurso}")
+            print(
+                f"   estado {pagina.status_code}"
+                f" | pluginfile: {html.count('pluginfile.php')}"
+                f" | fp-filename vazios: {nomes_vazios}"
+                f" | com nome: {max(nomes_cheios, 0)}"
+                f" | extraidos: {len(ficheiros)}"
+            )
+            for endereco, rotulo in ficheiros[:2]:
+                print(f"     - {rotulo[:30]:<32} {endereco[:58]}")
+            if guardar_em and vistas == 1:
+                guardar_em.parent.mkdir(parents=True, exist_ok=True)
+                guardar_em.write_text(html, encoding="utf-8")
+        if vistas >= quantas:
+            break
+
+    print()
+    print(f"{vistas} pastas inspecionadas, {com_conteudo} com ficheiros extraidos.")
+    if guardar_em:
+        print(f"HTML da primeira em {guardar_em}")
