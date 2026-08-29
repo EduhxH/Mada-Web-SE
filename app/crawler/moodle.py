@@ -399,9 +399,13 @@ def _descarregar_pasta(
             relatorio.ignorar(titulo, f"folder: estado HTTP {resposta.status_code}")
             continue
         nome = _nome_da_resposta(resposta, f"{titulo}.bin")
+        # A origem identifica o DOCUMENTO, e o id deriva dela. Sem o nome
+        # do ficheiro, todos os ficheiros de uma pasta ficavam com a mesma
+        # origem e so o primeiro sobrevivia a indexacao.
         _guardar_bytes(
             resposta.content, nome, f"folder-{identificador}-{nome}",
-            publico, titulo, destino, origens, relatorio, disciplina,
+            f"{publico}#{nome}", titulo, destino, origens, relatorio,
+            disciplina,
         )
 
 

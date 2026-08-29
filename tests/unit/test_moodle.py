@@ -262,3 +262,21 @@ def test_ficheiro_aceite_entra_no_manifesto(tmp_path):
     assert origens[guardado]["titulo"] == "Sebenta F5"
     assert (tmp_path / guardado).read_bytes().startswith(b"%PDF")
     assert relatorio.disciplinas["Fisica"] == 1
+
+
+def test_ficheiros_da_mesma_pasta_tem_origens_distintas(tmp_path):
+    """Sem isto, todos os ficheiros de uma pasta partilhavam a origem, logo o
+    mesmo id, e so o primeiro sobrevivia a indexacao."""
+    relatorio = moodle.RelatorioMoodle()
+    origens = {}
+    pasta_url = "https://m/mod/folder/view.php?id=42"
+    for nome in ("Ficha1.pdf", "Ficha2.pdf", "Ficha3.pdf"):
+        moodle._guardar_bytes(
+            b"%PDF conteudo", nome, f"folder-42-{nome}",
+            f"{pasta_url}#{nome}", nome[:-4],
+            tmp_path, origens, relatorio, "Fisica",
+        )
+    urls = [v["url"] for v in origens.values()]
+    assert len(urls) == 3
+    assert len(set(urls)) == 3
+    assert all(u.startswith(pasta_url) for u in urls)
