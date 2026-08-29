@@ -73,16 +73,51 @@ def test_pagina_de_estatisticas_gera_html(tmp_path):
     pagina = estatisticas.pagina(conexao)
     assert "<svg" in pagina
     assert "estatisticas" in pagina
-    assert "aluno-01" in pagina
 
 
 def test_pagina_escapa_consultas(tmp_path):
     from app.interface import estatisticas
 
     conexao = _registo(tmp_path)
-    uso.registar(
-        conexao, "a", uso.EVENTO_BUSCA, consulta="<script>x</script>", resultados=0
-    )
-    pagina = estatisticas.pagina(conexao)
+    for aluno in ("a", "b"):
+        uso.registar(
+            conexao, aluno, uso.EVENTO_BUSCA,
+            consulta="<script>x</script>", resultados=0,
+        )
+    pagina = estatisticas.pagina(conexao, administrador=True)
     assert "<script>x</script>" not in pagina
     assert "&lt;script&gt;" in pagina
+
+
+def test_participante_nao_ve_consultas_de_um_so_colega(tmp_path):
+    from app.interface import estatisticas
+
+    conexao = _registo(tmp_path)
+    uso.registar(
+        conexao, "aluno-02", uso.EVENTO_BUSCA,
+        consulta="assunto pessoal dele", resultados=0,
+    )
+    normal = estatisticas.pagina(conexao)
+    assert "assunto pessoal dele" not in normal
+    # o administrador precisa do dado completo para a investigacao
+    assert "assunto pessoal dele" in estatisticas.pagina(conexao, administrador=True)
+
+
+def test_participante_nao_ve_a_tabela_por_participante(tmp_path):
+    from app.interface import estatisticas
+
+    conexao = _registo(tmp_path)
+    uso.registar(conexao, "aluno-07", uso.EVENTO_BUSCA, consulta="x", resultados=1)
+    assert "aluno-07" not in estatisticas.pagina(conexao)
+    assert "aluno-07" in estatisticas.pagina(conexao, administrador=True)
+
+
+def test_consulta_de_dois_participantes_e_visivel(tmp_path):
+    from app.interface import estatisticas
+
+    conexao = _registo(tmp_path)
+    for aluno in ("aluno-01", "aluno-02"):
+        uso.registar(
+            conexao, aluno, uso.EVENTO_BUSCA, consulta="ficha comum", resultados=0
+        )
+    assert "ficha comum" in estatisticas.pagina(conexao)

@@ -60,7 +60,9 @@ def _cartao(rotulo: str, valor: str) -> str:
     )
 
 
-def pagina(conexao) -> str:
+def pagina(conexao, administrador: bool = False) -> str:
+    # Sem privilegios, so agregados: nada que identifique um colega.
+    minimo = 1 if administrador else 2
     dados = uso.resumo(conexao)
     cartoes = "".join(
         [
@@ -78,27 +80,32 @@ def pagina(conexao) -> str:
     seccoes = [
         f'<div class="cartoes">{cartoes}</div>',
         _barras(uso.por_dia(conexao), "Buscas por dia"),
-        _barras(
-            [(p, buscas) for p, buscas, _ in uso.por_participante(conexao)],
-            "Buscas por participante",
-        ),
         _barras(uso.disciplinas_filtradas(conexao), "Filtros de disciplina usados"),
         _tabela(
-            ["participante", "buscas", "aberturas"],
-            uso.por_participante(conexao),
-            "Uso por participante",
-        ),
-        _tabela(
             ["consulta", "vezes", "sem resultado"],
-            uso.consultas_populares(conexao),
+            uso.consultas_populares(conexao, minimo_participantes=minimo),
             "Consultas mais frequentes",
         ),
         _tabela(
             ["consulta", "vezes"],
-            uso.consultas_sem_resultado(conexao),
+            uso.consultas_sem_resultado(conexao, minimo_participantes=minimo),
             "Consultas que falharam (o que falta indexar)",
         ),
     ]
+    if administrador:
+        seccoes.insert(
+            4,
+            _tabela(
+                ["participante", "buscas", "aberturas"],
+                uso.por_participante(conexao),
+                "Uso por participante",
+            ),
+        )
+    else:
+        seccoes.append(
+            '<p class="vazio">Consultas feitas por uma so pessoa nao sao'
+            " mostradas, para nao identificar ninguem.</p>"
+        )
 
     return f"""<!doctype html>
 <html lang="pt-pt">

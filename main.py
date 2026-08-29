@@ -203,7 +203,9 @@ def comando_disciplinas() -> None:
     conexao.close()
 
 
-def comando_participantes(criar: int, revogar: str | None) -> None:
+def comando_participantes(
+    criar: int, revogar: str | None, prefixo: str = "aluno"
+) -> None:
     if revogar:
         if auth.revogar(revogar):
             print(f"Revogado: {revogar}")
@@ -212,7 +214,7 @@ def comando_participantes(criar: int, revogar: str | None) -> None:
         return
 
     if criar:
-        novos = auth.criar_participantes(criar)
+        novos = auth.criar_participantes(criar, prefixo)
         print("CODIGOS NOVOS - copie agora, nao voltam a ser mostrados:")
         print()
         for codigo, rotulo in novos.items():
@@ -302,6 +304,10 @@ def main() -> None:
     )
     p_part.add_argument("--criar", type=int, default=0)
     p_part.add_argument("--revogar", help="rotulo a revogar, ex.: aluno-03")
+    p_part.add_argument(
+        "--admin", action="store_true",
+        help="cria um codigo de administrador (ve as estatisticas completas)",
+    )
     subcomandos.add_parser("estatisticas", help="resumo de utilizacao")
     p_atual = subcomandos.add_parser(
         "atualizar", help="rastreia o site, reindexa tudo e diz o que mudou"
@@ -329,7 +335,11 @@ def main() -> None:
     elif argumentos.comando == "web":
         iniciar(argumentos.porta, argumentos.host)
     elif argumentos.comando == "participantes":
-        comando_participantes(argumentos.criar, argumentos.revogar)
+        comando_participantes(
+            argumentos.criar,
+            argumentos.revogar,
+            "admin" if argumentos.admin else "aluno",
+        )
     elif argumentos.comando == "estatisticas":
         comando_estatisticas()
     elif argumentos.comando == "atualizar":

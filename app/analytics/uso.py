@@ -119,21 +119,33 @@ def por_participante(conexao: sqlite3.Connection) -> list[tuple[str, int, int]]:
     ).fetchall()
 
 
-def consultas_populares(conexao: sqlite3.Connection, limite: int = 15):
+def consultas_populares(
+    conexao: sqlite3.Connection, limite: int = 15, minimo_participantes: int = 1
+):
     return conexao.execute(
         "SELECT consulta, COUNT(*), SUM(CASE WHEN resultados = 0 THEN 1 ELSE 0 END)"
         " FROM eventos WHERE tipo = ? AND consulta <> ''"
-        " GROUP BY LOWER(consulta) ORDER BY 2 DESC LIMIT ?",
-        (EVENTO_BUSCA, limite),
+        " GROUP BY LOWER(consulta)"
+        " HAVING COUNT(DISTINCT participante) >= ?"
+        " ORDER BY 2 DESC LIMIT ?",
+        (EVENTO_BUSCA, minimo_participantes, limite),
     ).fetchall()
 
 
-def consultas_sem_resultado(conexao: sqlite3.Connection, limite: int = 15):
+def consultas_sem_resultado(
+    conexao: sqlite3.Connection, limite: int = 15, minimo_participantes: int = 1
+):
+    """minimo_participantes=2 esconde consultas feitas por uma so pessoa.
+
+    Com 8 participantes, uma consulta unica identifica quem a escreveu.
+    """
     return conexao.execute(
         "SELECT consulta, COUNT(*) FROM eventos"
         " WHERE tipo = ? AND resultados = 0 AND consulta <> ''"
-        " GROUP BY LOWER(consulta) ORDER BY 2 DESC LIMIT ?",
-        (EVENTO_BUSCA, limite),
+        " GROUP BY LOWER(consulta)"
+        " HAVING COUNT(DISTINCT participante) >= ?"
+        " ORDER BY 2 DESC LIMIT ?",
+        (EVENTO_BUSCA, minimo_participantes, limite),
     ).fetchall()
 
 

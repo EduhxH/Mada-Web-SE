@@ -9,7 +9,7 @@ from urllib.parse import parse_qs, urlencode, urlparse
 
 from app.analytics import uso
 from app.indexing import storage
-from app.interface import auth, disciplina as pagina_disciplina, estatisticas
+from app.interface import auth, disciplina as pagina_disciplina, estatisticas, protecao
 from app.interface.preview import fragmento, resolver_origem
 from app.indexing.tokenizer import tokenizar
 import json
@@ -535,14 +535,42 @@ def _montar_pagina(
     )
 
 
+_limite_geral = protecao.Limitador(
+    protecao.PEDIDOS_POR_MINUTO, protecao.JANELA_GERAL
+)
+_limite_entrada = protecao.Limitador(
+    protecao.TENTATIVAS_ENTRADA, protecao.JANELA_ENTRADA
+)
+
+
 class _Servidor(ThreadingHTTPServer):
     # No Windows, allow_reuse_address permite que varios processos se liguem a
     # mesma porta em silencio - e o pedido acaba a ser servido por um processo
     # antigo, com codigo antigo. Preferimos falhar alto.
     allow_reuse_address = False
+    daemon_threads = True
 
 
 class _Manipulador(BaseHTTPRequestHandler):
+    # Uma ligacao que nunca acaba de enviar prende uma thread para sempre.
+    timeout = 20
+    protocol_version = "HTTP/1.1"
+
+    def handle_one_request(self):
+        try:
+            super().handle_one_request()
+        except (TimeoutError, ConnectionError, OSError):
+            self.close_connection = True
+
+    def _endereco(self) -> str:
+        return protecao.endereco_do_pedido(self)
+
+    def _excedeu_limite(self) -> bool:
+        if _limite_geral.permitir(self._endereco()):
+            return False
+        self.send_error(429, "demasiados pedidos")
+        return True
+
     def _participante(self) -> str | None:
         bruto = self.headers.get("Cookie")
         if not bruto:
@@ -560,6 +588,17 @@ class _Manipulador(BaseHTTPRequestHandler):
         if urlparse(self.path).path != "/entrar":
             self.send_error(404)
             return
+        if self._excedeu_limite():
+            return
+        endereco = self._endereco()
+        if not _limite_entrada.permitir(endereco):
+            self._responder(
+                _pagina_entrada(
+                    "Demasiadas tentativas. Tente daqui a 15 minutos."
+                ),
+                "text/html; charset=utf-8",
+            )
+            return
         tamanho = int(self.headers.get("Content-Length") or 0)
         corpo = self.rfile.read(min(tamanho, 4096)).decode("utf-8", errors="replace")
         codigo = parse_qs(corpo).get("codigo", [""])[0]
@@ -567,6 +606,7 @@ class _Manipulador(BaseHTTPRequestHandler):
         if participante is None:
             self._responder(_pagina_entrada("Codigo invalido."), "text/html; charset=utf-8")
             return
+        _limite_entrada.limpar(endereco)
         sessao = auth.criar_sessao(participante, auth.segredo())
         with uso.abrir() as registo:
             uso.registar(registo, participante, uso.EVENTO_ENTRADA)
@@ -581,6 +621,8 @@ class _Manipulador(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self):
+        if self._excedeu_limite():
+            return
         url = urlparse(self.path)
         parametros = parse_qs(url.query)
 
@@ -614,7 +656,9 @@ class _Manipulador(BaseHTTPRequestHandler):
             return
         if url.path == "/estatisticas":
             with uso.abrir() as registo:
-                corpo = estatisticas.pagina(registo).encode("utf-8")
+                corpo = estatisticas.pagina(
+                    registo, auth.e_administrador(participante)
+                ).encode("utf-8")
             self._responder(corpo, "text/html; charset=utf-8")
             return
         if url.path != "/":
@@ -718,8 +762,13 @@ class _Manipulador(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-Type", tipo)
         self.send_header("Content-Length", str(len(corpo)))
+        for chave, valor in protecao.CABECALHOS_SEGURANCA.items():
+            self.send_header(chave, valor)
         if nome:
-            self.send_header("Content-Disposition", f'inline; filename="{nome}"')
+            seguro = protecao.sanear_nome_ficheiro(nome)
+            self.send_header(
+                "Content-Disposition", f'inline; filename="{seguro}"'
+            )
         self.end_headers()
         self.wfile.write(corpo)
 

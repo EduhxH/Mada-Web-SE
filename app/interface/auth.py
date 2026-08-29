@@ -15,6 +15,8 @@ NOME_COOKIE = "madalena"
 VALIDADE_DIAS = 30
 ALFABETO = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 PADRAO_CODIGO = re.compile(r"^[A-Z0-9]{4}-[A-Z0-9]{4}$")
+# Participantes cujo rotulo comeca assim veem as estatisticas completas.
+PREFIXO_ADMIN = "admin"
 
 _env_carregado = False
 
@@ -135,6 +137,10 @@ def validar_sessao(valor: str, chave: bytes) -> str | None:
     if idade > VALIDADE_DIAS * 86400 or idade < -3600:
         return None
     return participante
+
+
+def e_administrador(rotulo: str | None) -> bool:
+    return bool(rotulo) and rotulo.startswith(PREFIXO_ADMIN)
 
 
 def participante_do_codigo(codigo: str) -> str | None:
