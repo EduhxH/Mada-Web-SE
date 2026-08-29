@@ -9,12 +9,13 @@ alterado. O servidor da escola nao deve dar pela diferenca para um aluno a
 navegar.
 """
 
+import json
 import os
 import re
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from urllib.parse import parse_qs, urljoin, urlparse
+from urllib.parse import parse_qs, urlparse
 
 import requests
 from bs4 import BeautifulSoup
@@ -33,10 +34,16 @@ VAR_SENHA = "MOODLE_SENHA"
 # Modulos que contem material para indexar. Foruns, questionarios e chats
 # ficam de fora: sao conversas e avaliacoes, nao material de estudo.
 MODULOS_UTEIS = ("resource", "folder", "page", "book", "url")
+# Modulos escritos dentro do proprio Moodle: guardam-se como HTML.
+MODULOS_HTML = ("page", "book")
 
 EXTENSOES_ACEITES = {
     ".pdf", ".docx", ".pptx", ".txt", ".md", ".odt", ".ods", ".zip", ".cs",
 }
+
+# O Windows recusa nomes terminados em ponto ou espaco, e o Moodle trunca os
+# nomes das disciplinas com reticencias na lista.
+_PROIBIDOS_EM_NOME = re.compile(r'[<>:"/\\|?*]')
 
 
 class ErroMoodle(RuntimeError):
@@ -88,7 +95,8 @@ def iniciar_sessao(url_base: str, utilizador: str, senha: str) -> requests.Sessi
     resposta = sessao.post(entrada, data=dados, timeout=TEMPO_LIMITE)
     if not sessao_valida(sessao, url_base):
         motivo = "credenciais recusadas"
-        if "cookies" in resposta.text.lower() and "bloquead" in resposta.text.lower():
+        texto = resposta.text.lower()
+        if "cookie" in texto and "bloquead" in texto:
             motivo = "cookies bloqueados pelo Moodle"
         raise ErroMoodle(f"Login falhou: {motivo}.")
     return sessao
@@ -101,10 +109,24 @@ def sessao_valida(sessao: requests.Session, url_base: str) -> bool:
     return "login/index.php" not in pagina.url
 
 
+def obter_sesskey(sessao: requests.Session, url_base: str) -> str:
+    """O Moodle exige sesskey em algumas accoes, como descarregar uma pasta."""
+    pagina = sessao.get(f"{url_base}/my/", timeout=TEMPO_LIMITE)
+    casado = re.search(r'"sesskey":"([^"]+)"', pagina.text)
+    if casado:
+        return casado.group(1)
+    casado = re.search(r"sesskey=([A-Za-z0-9]+)", pagina.text)
+    return casado.group(1) if casado else ""
+
+
 def listar_disciplinas(
     sessao: requests.Session, url_base: str
 ) -> list[tuple[int, str]]:
-    """Disciplinas em que o utilizador esta inscrito."""
+    """Disciplinas em que o utilizador esta inscrito.
+
+    Os nomes daqui podem vir truncados pelo tema do Moodle; o nome completo
+    e lido depois, na propria pagina da disciplina.
+    """
     pagina = sessao.get(f"{url_base}/my/courses.php", timeout=TEMPO_LIMITE)
     if pagina.status_code != 200:
         pagina = sessao.get(f"{url_base}/my/", timeout=TEMPO_LIMITE)
@@ -118,23 +140,31 @@ def listar_disciplinas(
         identificadores = parametros.get("id")
         if not identificadores or not identificadores[0].isdigit():
             continue
-        nome = " ".join(ligacao.get_text(" ", strip=True).split())
+        nome = ligacao.get("title") or ligacao.get_text(" ", strip=True)
+        nome = " ".join(nome.split())
         if nome:
             encontradas.setdefault(int(identificadores[0]), nome)
     return sorted(encontradas.items(), key=lambda par: par[1])
 
 
-def recursos_da_disciplina(
+def pagina_da_disciplina(
     sessao: requests.Session, url_base: str, curso: int
-) -> list[tuple[str, int, str]]:
-    """(modulo, id, nome) de cada recurso da pagina da disciplina."""
+) -> tuple[str, list[tuple[str, int, str]]]:
+    """(nome completo, recursos) a partir da pagina da disciplina."""
     pagina = sessao.get(
         f"{url_base}/course/view.php?id={curso}", timeout=TEMPO_LIMITE
     )
     sopa = BeautifulSoup(pagina.text, "html.parser")
+
+    nome = ""
+    cabecalho = sopa.find("h1")
+    if cabecalho:
+        nome = " ".join(cabecalho.get_text(" ", strip=True).split())
+    if not nome and sopa.title:
+        nome = sopa.title.get_text(strip=True).split("|")[0].strip()
+
     encontrados: list[tuple[str, int, str]] = []
     vistos: set[tuple[str, int]] = set()
-
     for ligacao in sopa.find_all("a", href=True):
         casado = re.search(r"/mod/([a-z]+)/view\.php\?id=(\d+)", ligacao["href"])
         if not casado:
@@ -143,22 +173,54 @@ def recursos_da_disciplina(
         if modulo not in MODULOS_UTEIS or (modulo, identificador) in vistos:
             continue
         vistos.add((modulo, identificador))
-        nome = " ".join(ligacao.get_text(" ", strip=True).split())
-        encontrados.append((modulo, identificador, nome or f"{modulo}-{identificador}"))
-    return encontrados
+        texto = " ".join(ligacao.get_text(" ", strip=True).split())
+        encontrados.append(
+            (modulo, identificador, texto or f"{modulo}-{identificador}")
+        )
+    return nome, encontrados
 
 
-def _nome_da_resposta(resposta: requests.Response, alternativa: str) -> str:
+def _nome_da_resposta(resposta, alternativa: str) -> str:
     disposicao = resposta.headers.get("Content-Disposition", "")
     casado = re.search(r'filename="?([^";]+)"?', disposicao)
     if casado:
         return casado.group(1)
     caminho = urlparse(resposta.url).path
-    # So aceitar o nome do URL se a extensao for de conteudo: um recurso
-    # que nao redireciona fica em .../view.php e nao e isso que queremos.
+    # So aceitar o nome do URL se a extensao for de conteudo: um recurso que
+    # nao redireciona fica em .../view.php e nao e isso que queremos.
     if caminho and Path(caminho).suffix.lower() in EXTENSOES_ACEITES:
         return Path(caminho).name
     return alternativa
+
+
+def _registar(relatorio: RelatorioMoodle, disciplina: str, tamanho: int) -> None:
+    relatorio.ficheiros += 1
+    relatorio.bytes_totais += tamanho
+    relatorio.disciplinas[disciplina] = relatorio.disciplinas.get(disciplina, 0) + 1
+
+
+def _guardar_html(
+    resposta,
+    alvo: str,
+    destino: Path,
+    origens: dict[str, str],
+    relatorio: RelatorioMoodle,
+    disciplina: str,
+    alternativa: str,
+) -> None:
+    """Uma 'page' ou 'book' do Moodle e material escrito no proprio Moodle."""
+    sopa = BeautifulSoup(resposta.text, "html.parser")
+    principal = sopa.find("div", {"role": "main"}) or sopa.find("body")
+    if principal is None or not principal.get_text(strip=True):
+        relatorio.ignorar(alternativa, "pagina sem conteudo")
+        return
+    marcador = f'<meta name="madalena-origem" content="{alvo}">'
+    html = f"<html><head>{marcador}</head><body>{principal}</body></html>"
+    destino.mkdir(parents=True, exist_ok=True)
+    guardado = nome_ficheiro(alvo, ".html")
+    (destino / guardado).write_text(html, encoding="utf-8")
+    origens[guardado] = alvo
+    _registar(relatorio, disciplina, len(html))
 
 
 def descarregar_recurso(
@@ -170,9 +232,13 @@ def descarregar_recurso(
     origens: dict[str, str],
     relatorio: RelatorioMoodle,
     disciplina: str,
+    sesskey: str = "",
 ) -> None:
+    rotulo = f"{modulo}-{identificador}"
     if modulo == "folder":
         alvo = f"{url_base}/mod/folder/download_folder.php?id={identificador}"
+        if sesskey:
+            alvo += f"&sesskey={sesskey}"
     else:
         alvo = f"{url_base}/mod/{modulo}/view.php?id={identificador}&redirect=1"
 
@@ -180,95 +246,50 @@ def descarregar_recurso(
         resposta = sessao.get(alvo, timeout=TEMPO_LIMITE, allow_redirects=True)
         relatorio.pedidos += 1
     except requests.RequestException as erro:
-        relatorio.ignorar(f"{modulo}-{identificador}", f"erro de rede: {erro}")
+        relatorio.ignorar(rotulo, f"erro de rede: {erro}")
         return
 
     if resposta.status_code != 200:
-        relatorio.ignorar(
-            f"{modulo}-{identificador}", f"estado HTTP {resposta.status_code}"
-        )
+        relatorio.ignorar(rotulo, f"estado HTTP {resposta.status_code}")
         return
 
     tipo = resposta.headers.get("Content-Type", "")
     if "text/html" in tipo:
-        relatorio.ignorar(f"{modulo}-{identificador}", "pagina, nao ficheiro")
+        if modulo in MODULOS_HTML:
+            _guardar_html(
+                resposta, alvo, destino, origens, relatorio, disciplina, rotulo
+            )
+        else:
+            relatorio.ignorar(rotulo, "pagina, nao ficheiro")
         return
 
-    nome = _nome_da_resposta(resposta, f"{modulo}-{identificador}.bin")
+    nome = _nome_da_resposta(resposta, f"{rotulo}.bin")
     extensao = Path(nome).suffix.lower()
     if extensao and extensao not in EXTENSOES_ACEITES:
         relatorio.ignorar(nome, f"extensao {extensao} nao aceite")
         return
 
     destino.mkdir(parents=True, exist_ok=True)
-    guardado = nome_ficheiro(
-        f"{alvo}#{nome}", extensao or ".bin"
-    )
+    guardado = nome_ficheiro(f"{alvo}#{nome}", extensao or ".bin")
     (destino / guardado).write_bytes(resposta.content)
     origens[guardado] = f"{url_base}/mod/{modulo}/view.php?id={identificador}"
-
-    relatorio.ficheiros += 1
-    relatorio.bytes_totais += len(resposta.content)
-    relatorio.disciplinas[disciplina] = relatorio.disciplinas.get(disciplina, 0) + 1
+    _registar(relatorio, disciplina, len(resposta.content))
 
 
-def sincronizar(
-    raiz: Path,
-    disciplinas_pedidas: list[str] | None = None,
-    intervalo: float = INTERVALO_PADRAO,
-    limite_por_disciplina: int = 0,
-    ao_progredir=None,
-) -> RelatorioMoodle:
-    url_base, utilizador, senha = configuracao()
-    sessao = iniciar_sessao(url_base, utilizador, senha)
-    relatorio = RelatorioMoodle()
-
-    todas = listar_disciplinas(sessao, url_base)
-    if disciplinas_pedidas:
-        procurados = [d.lower() for d in disciplinas_pedidas]
-        todas = [
-            (identificador, nome)
-            for identificador, nome in todas
-            if any(p in nome.lower() for p in procurados)
-        ]
-
-    ultimo = 0.0
-    for identificador, nome in todas:
-        pasta = raiz / _pasta_da_disciplina(nome)
-        origens: dict[str, str] = {}
-        recursos = recursos_da_disciplina(sessao, url_base, identificador)
-        relatorio.pedidos += 1
-        if limite_por_disciplina:
-            recursos = recursos[:limite_por_disciplina]
-
-        if ao_progredir:
-            ao_progredir(nome, len(recursos))
-
-        for modulo, recurso, _ in recursos:
-            espera = intervalo - (time.monotonic() - ultimo)
-            if espera > 0:
-                time.sleep(espera)
-            ultimo = time.monotonic()
-            descarregar_recurso(
-                sessao, url_base, modulo, recurso, pasta, origens, relatorio, nome
-            )
-
-        if origens:
-            _escrever_manifesto(pasta, origens)
-
-    return relatorio
-
-
-def _pasta_da_disciplina(nome: str) -> str:
+def pasta_da_disciplina(nome: str) -> str:
     limpo = re.sub(r"^PSI\d+\s*[-:]\s*", "", nome)
     limpo = re.sub(r"^Disciplina de\s+", "", limpo, flags=re.IGNORECASE)
-    limpo = re.sub(r'[<>:"/\\|?*]', "-", limpo).strip()
-    return limpo[:60] or nome[:60]
+    limpo = _PROIBIDOS_EM_NOME.sub("-", limpo)
+    limpo = limpo.replace("…", "")
+    limpo = limpo.strip().rstrip(". ")
+    return limpo[:60].strip().rstrip(". ") or "disciplina"
+
+
+# nome antigo, mantido para nao partir chamadas existentes
+_pasta_da_disciplina = pasta_da_disciplina
 
 
 def _escrever_manifesto(pasta: Path, origens: dict[str, str]) -> None:
-    import json
-
     pasta.mkdir(parents=True, exist_ok=True)
     caminho = pasta / NOME_MANIFESTO
     existentes: dict[str, str] = {}
@@ -281,3 +302,55 @@ def _escrever_manifesto(pasta: Path, origens: dict[str, str]) -> None:
     caminho.write_text(
         json.dumps(existentes, ensure_ascii=False, indent=1), encoding="utf-8"
     )
+
+
+def sincronizar(
+    raiz: Path,
+    disciplinas_pedidas: list[str] | None = None,
+    intervalo: float = INTERVALO_PADRAO,
+    limite_por_disciplina: int = 0,
+    ao_progredir=None,
+) -> RelatorioMoodle:
+    url_base, utilizador, senha = configuracao()
+    sessao = iniciar_sessao(url_base, utilizador, senha)
+    sesskey = obter_sesskey(sessao, url_base)
+    relatorio = RelatorioMoodle()
+
+    todas = listar_disciplinas(sessao, url_base)
+    if disciplinas_pedidas:
+        procurados = [d.lower() for d in disciplinas_pedidas]
+        todas = [
+            (identificador, nome)
+            for identificador, nome in todas
+            if any(p in nome.lower() for p in procurados)
+        ]
+
+    ultimo = 0.0
+    for identificador, nome_curto in todas:
+        nome_completo, recursos = pagina_da_disciplina(
+            sessao, url_base, identificador
+        )
+        relatorio.pedidos += 1
+        nome = nome_completo or nome_curto
+        pasta = raiz / pasta_da_disciplina(nome)
+        origens: dict[str, str] = {}
+
+        if limite_por_disciplina:
+            recursos = recursos[:limite_por_disciplina]
+        if ao_progredir:
+            ao_progredir(nome, len(recursos))
+
+        for modulo, recurso, _ in recursos:
+            espera = intervalo - (time.monotonic() - ultimo)
+            if espera > 0:
+                time.sleep(espera)
+            ultimo = time.monotonic()
+            descarregar_recurso(
+                sessao, url_base, modulo, recurso, pasta, origens, relatorio,
+                nome, sesskey,
+            )
+
+        if origens:
+            _escrever_manifesto(pasta, origens)
+
+    return relatorio

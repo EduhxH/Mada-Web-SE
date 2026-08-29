@@ -63,3 +63,62 @@ def test_nome_da_resposta_usa_a_alternativa():
 def test_modulos_de_conversa_ficam_de_fora():
     for modulo in ("forum", "quiz", "chat", "assign"):
         assert modulo not in moodle.MODULOS_UTEIS
+
+
+def test_pasta_nunca_termina_em_ponto():
+    """O Windows recusa pastas terminadas em ponto: era o FileNotFoundError."""
+    for nome in ("PSI9-Arquitetura de Computa...", "Algo.", "Outro . . ."):
+        resultado = moodle.pasta_da_disciplina(nome)
+        assert not resultado.endswith(".")
+        assert not resultado.endswith(" ")
+
+
+def test_pasta_remove_reticencias_unicode():
+    assert "\u2026" not in moodle.pasta_da_disciplina("Tecnologias de Informa\u2026")
+
+
+def test_pasta_nunca_fica_vazia():
+    assert moodle.pasta_da_disciplina("...") == "disciplina"
+    assert moodle.pasta_da_disciplina("///") != ""
+
+
+def test_sesskey_extraido_do_javascript():
+    class Falsa:
+        text = 'var M = {"sesskey":"aBc123XyZ","other":1};'
+        status_code = 200
+
+    class SessaoFalsa:
+        def get(self, *a, **k):
+            return Falsa()
+
+    assert moodle.obter_sesskey(SessaoFalsa(), "https://x") == "aBc123XyZ"
+
+
+def test_sesskey_extraido_de_um_link():
+    class Falsa:
+        text = '<a href="/login/logout.php?sesskey=Zx9Qw">Sair</a>'
+        status_code = 200
+
+    class SessaoFalsa:
+        def get(self, *a, **k):
+            return Falsa()
+
+    assert moodle.obter_sesskey(SessaoFalsa(), "https://x") == "Zx9Qw"
+
+
+def test_sesskey_ausente_devolve_vazio():
+    class Falsa:
+        text = "<html>sem nada</html>"
+        status_code = 200
+
+    class SessaoFalsa:
+        def get(self, *a, **k):
+            return Falsa()
+
+    assert moodle.obter_sesskey(SessaoFalsa(), "https://x") == ""
+
+
+def test_paginas_do_moodle_sao_guardadas_como_html():
+    assert "page" in moodle.MODULOS_HTML
+    assert "book" in moodle.MODULOS_HTML
+    assert "resource" not in moodle.MODULOS_HTML
