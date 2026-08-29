@@ -1,3 +1,4 @@
+import hashlib
 import io
 import json
 import logging
@@ -46,6 +47,11 @@ MOTIVO_BUILD = "artefacto de build"
 MOTIVO_SEM_TEXTO = "sem texto extraivel"
 MOTIVO_CORROMPIDO = "ficheiro ilegivel"
 MOTIVO_ZIP_ANINHADO = "zip dentro de zip"
+MOTIVO_DUPLICADO = "documento repetido"
+
+# 48 bits: com milhares de documentos a hipotese de colisao e de 1 em
+# centenas de milhoes, e a origem ja e unica por documento.
+BYTES_ID = 6
 
 
 @dataclass
@@ -75,6 +81,7 @@ def carregar(caminho: str | Path) -> tuple[list[Documento], Relatorio]:
         arquivos = [raiz]
 
     manifestos: dict[Path, dict[str, str]] = {}
+    vistos: set[int] = set()
     for arquivo in arquivos:
         if arquivo.name == NOME_MANIFESTO:
             continue
@@ -88,9 +95,24 @@ def carregar(caminho: str | Path) -> tuple[list[Documento], Relatorio]:
             disciplina=_disciplina(raiz, arquivo),
             documentos=documentos,
             relatorio=relatorio,
+            vistos=vistos,
         )
 
     return documentos, relatorio
+
+
+def id_estavel(origem: str) -> int:
+    """Id derivado da origem, nao da ordem de leitura.
+
+    Com ids sequenciais, acrescentar um ficheiro no inicio da pasta
+    deslocava todos os outros - e os cliques ja registados passavam a
+    apontar para documentos errados. Assim, o mesmo ficheiro tem sempre o
+    mesmo id, reindexe-se as vezes que for preciso.
+    """
+    resumo = hashlib.blake2b(
+        origem.encode("utf-8"), digest_size=BYTES_ID
+    ).hexdigest()
+    return int(resumo, 16)
 
 
 def _ler_manifesto(pasta: Path) -> dict[str, str]:
@@ -145,8 +167,10 @@ def _processar(
     disciplina: str,
     documentos: list[Documento],
     relatorio: Relatorio,
+    vistos: set[int] | None = None,
     dentro_de_zip: bool = False,
 ) -> None:
+    vistos = vistos if vistos is not None else set()
     extensao = Path(nome).suffix.lower()
 
     if nome.lower() in NOMES_PROIBIDOS or extensao in EXTENSOES_PROIBIDAS:
@@ -161,7 +185,7 @@ def _processar(
         if dentro_de_zip:
             relatorio.ignorar(origem, MOTIVO_ZIP_ANINHADO)
             return
-        _processar_zip(dados, origem, disciplina, documentos, relatorio)
+        _processar_zip(dados, origem, disciplina, documentos, relatorio, vistos)
         return
 
     if extensao not in EXTENSOES_SUPORTADAS:
@@ -185,17 +209,27 @@ def _processar(
         origem = origem_declarada(dados) or origem
         base = titulo_html(dados) or base
 
-    for texto, sufixo_titulo, sufixo_origem in unidades:
+    guardados = 0
+    for conteudo, sufixo_titulo, sufixo_origem in unidades:
+        origem_completa = origem + sufixo_origem
+        identificador = id_estavel(origem_completa)
+        if identificador in vistos:
+            relatorio.ignorar(origem_completa, MOTIVO_DUPLICADO)
+            continue
+        vistos.add(identificador)
         documentos.append(
             Documento(
-                id=len(documentos) + 1,
+                id=identificador,
                 titulo=base + sufixo_titulo,
-                texto=texto,
-                origem=origem + sufixo_origem,
+                texto=conteudo,
+                origem=origem_completa,
                 disciplina=disciplina,
             )
         )
-    relatorio.por_disciplina[disciplina] += len(unidades)
+        guardados += 1
+    if not guardados:
+        return
+    relatorio.por_disciplina[disciplina] += guardados
     relatorio.por_formato[extensao] += 1
 
 
@@ -205,6 +239,7 @@ def _processar_zip(
     disciplina: str,
     documentos: list[Documento],
     relatorio: Relatorio,
+    vistos: set[int],
 ) -> None:
     try:
         arquivo_zip = zipfile.ZipFile(io.BytesIO(dados))
@@ -233,6 +268,7 @@ def _processar_zip(
                 disciplina=disciplina,
                 documentos=documentos,
                 relatorio=relatorio,
+                vistos=vistos,
                 dentro_de_zip=True,
             )
 

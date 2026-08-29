@@ -73,11 +73,44 @@ def test_ficheiro_vazio_e_reportado(tmp_path):
     assert relatorio.ignorados
 
 
-def test_ids_sao_sequenciais(tmp_path):
+def test_ids_sao_estaveis_entre_indexacoes(tmp_path):
     _criar(tmp_path / "A", "um.txt")
     _criar(tmp_path / "B", "dois.txt")
+    primeira = {d.origem: d.id for d in carregar(tmp_path)[0]}
+    segunda = {d.origem: d.id for d in carregar(tmp_path)[0]}
+    assert primeira == segunda
+
+
+def test_ficheiro_novo_nao_desloca_os_outros(tmp_path):
+    """O problema que motivou esta mudanca: com ids sequenciais, um
+    ficheiro novo no inicio da pasta deslocava todos os seguintes."""
+    _criar(tmp_path / "A", "meio.txt")
+    _criar(tmp_path / "A", "zzz.txt")
+    antes = {d.origem: d.id for d in carregar(tmp_path)[0]}
+
+    _criar(tmp_path / "A", "aaa.txt")  # passa a ser o primeiro por ordem
+    depois = {d.origem: d.id for d in carregar(tmp_path)[0]}
+
+    for origem, identificador in antes.items():
+        assert depois[origem] == identificador
+
+
+def test_ids_sao_distintos(tmp_path):
+    for n in range(30):
+        _criar(tmp_path / "A", f"f{n}.txt", f"conteudo numero {n}".encode())
     documentos, _ = carregar(tmp_path)
-    assert [d.id for d in documentos] == [1, 2]
+    identificadores = [d.id for d in documentos]
+    assert len(identificadores) == len(set(identificadores))
+
+
+def test_documento_repetido_e_ignorado(tmp_path):
+    from app.crawler.local_source import MOTIVO_DUPLICADO, id_estavel
+
+    _criar(tmp_path / "A", "um.txt")
+    documentos, relatorio = carregar(tmp_path)
+    assert len(documentos) == 1
+    assert documentos[0].id == id_estavel(documentos[0].origem)
+    assert relatorio.por_motivo(MOTIVO_DUPLICADO) == []
 
 
 def test_disciplina_e_a_pasta_mais_proxima(tmp_path):

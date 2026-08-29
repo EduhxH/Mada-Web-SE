@@ -81,10 +81,11 @@ Zero search APIs. Every result is computed here.
 | 🔗 **Click to Open** | Results link straight to the source file, served by the engine — PDFs open at the exact page, files inside ZIPs are read in memory. Lookup is by document id, never by user-supplied path. | ✅ Done |
 | 🪜 **Graceful Relaxation** | Three levels — all terms, then a quorum of `max(2, ⌈0.6q⌉)`, then any term — stepping down only until results appear. One counting pass yields every level. | ✅ Done |
 | ✅ **Auto-correction** | Typos at edit distance 1 whose correction is backed by 3+ documents are applied automatically, with a one-click escape back to the literal query. | ✅ Done |
+| 🔑 **Stable Document Ids** | Ids are derived from the document's origin, not from read order, so reindexing after new material arrives never shifts them — the recorded click history keeps pointing at the right documents. | ✅ Done |
 | 🔁 **Morphological Expansion** | Singular/plural variants are added to the query — rules propose, the index vocabulary decides, so nothing is ever invented. Fixes 25% of the vocabulary being duplicated by number, without the information loss of stemming. | ✅ Done |
 | ⬆️ **Title Boost** | A hit in the title outweighs one in the body — the title says what a document *is*, the body only what it mentions. Applied after ranking, at no extra I/O cost. | ✅ Done |
 | 📊 **TF-IDF Ranking** | TF = freq / doc length, IDF = log(N / df); rare terms weigh more, long documents don't win by length alone. | ✅ Done |
-| 🧪 **Oracle-verified Tests** | 247 pytest tests; the integration suite proves the index returns exactly what the naive search returns. | ✅ Done |
+| 🧪 **Oracle-verified Tests** | 252 pytest tests; the integration suite proves the index returns exactly what the naive search returns. | ✅ Done |
 | ⏱️ **Naive vs. Indexed Benchmark** | `scripts/comparar_busca.py` times both paths on the real corpus and checks they agree. | ✅ Done |
 | 💻 **CLI** | `indexar` / `buscar` subcommands plus an interactive prompt with context snippets. | ✅ Done |
 | 🖥️ **Local Web UI** | Plain, dependency-free search page (standard-library HTTP server, term highlighting): `python main.py web`. | ✅ Done |
@@ -293,7 +294,7 @@ Mada-Web-SE/
 ├── data/                        # Corpus, index, secrets — all git-ignored
 ├── docs/                        # Design and study notes (pt)
 ├── scripts/comparar_busca.py    # Naive vs. indexed benchmark
-├── tests/{unit,integration}/    # 247 tests
+├── tests/{unit,integration}/    # 252 tests
 ├── main.py                      # CLI entry point
 └── .env.example                 # MADALENA_SEGREDO for deployment
 ```
@@ -375,6 +376,7 @@ drove each decision:
 | `12`–`13` | Query suggestions, discipline landing page |
 | `14` | POS tagging and topic-noise removal (three rounds, with rejected rules) |
 | `15`–`17` | Result sections, tolerant search, morphological expansion |
+| `18` | Stable document ids, and the corpus update procedure |
 
 ## 🧠 What I Learned
 
