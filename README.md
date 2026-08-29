@@ -82,12 +82,13 @@ Zero search APIs. Every result is computed here.
 | 🪜 **Graceful Relaxation** | Three levels — all terms, then a quorum of `max(2, ⌈0.6q⌉)`, then any term — stepping down only until results appear. One counting pass yields every level. | ✅ Done |
 | ✅ **Auto-correction** | Typos at edit distance 1 whose correction is backed by 3+ documents are applied automatically, with a one-click escape back to the literal query. | ✅ Done |
 | 🛡️ **Hardened for Exposure** | Rate limiting (120/min, 5 login attempts per 15 min) keyed on the real client IP behind a tunnel, connection timeouts, security headers, filename sanitisation against header injection, and admin-only access to identifying statistics. | ✅ Done |
+| 🎓 **Moodle Connector** | Authenticated session against the school's Moodle (credentials from a git-ignored `.env`), listing enrolled courses and syncing their materials — resources and folders only, never forums, quizzes or submissions. | 🔨 Untested against the live server |
 | 🔄 **One-command Update** | `python main.py atualizar` crawls the site, reindexes everything and reports what changed — new, modified, removed, unchanged. The crawler writes to a staging folder and swaps atomically, so an interrupted run never damages a working corpus. | ✅ Done |
 | 🔑 **Stable Document Ids** | Ids are derived from the document's origin, not from read order, so reindexing after new material arrives never shifts them — the recorded click history keeps pointing at the right documents. | ✅ Done |
 | 🔁 **Morphological Expansion** | Singular/plural variants are added to the query — rules propose, the index vocabulary decides, so nothing is ever invented. Fixes 25% of the vocabulary being duplicated by number, without the information loss of stemming. | ✅ Done |
 | ⬆️ **Title Boost** | A hit in the title outweighs one in the body — the title says what a document *is*, the body only what it mentions. Applied after ranking, at no extra I/O cost. | ✅ Done |
 | 📊 **TF-IDF Ranking** | TF = freq / doc length, IDF = log(N / df); rare terms weigh more, long documents don't win by length alone. | ✅ Done |
-| 🧪 **Oracle-verified Tests** | 279 pytest tests; the integration suite proves the index returns exactly what the naive search returns. | ✅ Done |
+| 🧪 **Oracle-verified Tests** | 287 pytest tests; the integration suite proves the index returns exactly what the naive search returns. | ✅ Done |
 | ⏱️ **Naive vs. Indexed Benchmark** | `scripts/comparar_busca.py` times both paths on the real corpus and checks they agree. | ✅ Done |
 | 💻 **CLI** | `indexar` / `buscar` subcommands plus an interactive prompt with context snippets. | ✅ Done |
 | 🖥️ **Local Web UI** | Plain, dependency-free search page (standard-library HTTP server, term highlighting): `python main.py web`. | ✅ Done |
@@ -296,7 +297,7 @@ Mada-Web-SE/
 ├── data/                        # Corpus, index, secrets — all git-ignored
 ├── docs/                        # Design and study notes (pt)
 ├── scripts/comparar_busca.py    # Naive vs. indexed benchmark
-├── tests/{unit,integration}/    # 279 tests
+├── tests/{unit,integration}/    # 287 tests
 ├── main.py                      # CLI entry point
 └── .env.example                 # MADALENA_SEGREDO for deployment
 ```
@@ -379,7 +380,7 @@ drove each decision:
 | `14` | POS tagging and topic-noise removal (three rounds, with rejected rules) |
 | `15`–`17` | Result sections, tolerant search, morphological expansion |
 | `18`–`19` | Stable document ids; one-command corpus update |
-| `20` | Security audit and hardening for public exposure |
+| `20`–`21` | Security hardening for public exposure; Moodle connector |
 
 ## 🧠 What I Learned
 

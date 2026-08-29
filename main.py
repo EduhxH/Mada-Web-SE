@@ -4,6 +4,7 @@ import time
 from pathlib import Path
 
 from app.crawler.local_source import MOTIVO_PRIVADO, Relatorio, carregar
+from app.crawler import moodle
 from app.crawler.web_source import rastrear
 from app.analytics import uso
 from app.indexing import atualizacao, storage
@@ -192,6 +193,79 @@ def comando_atualizar(
     imprimir_relatorio(relatorio)
 
 
+def comando_moodle(
+    disciplinas: list[str] | None, intervalo: float, limite: int, listar: bool
+) -> None:
+    try:
+        url_base, utilizador, _ = moodle.configuracao()
+    except moodle.ErroMoodle as erro:
+        print(erro)
+        return
+
+    print(f"A entrar em {url_base} como {utilizador}...")
+    try:
+        sessao = moodle.iniciar_sessao(*moodle.configuracao())
+    except moodle.ErroMoodle as erro:
+        print(f"  {erro}")
+        return
+    except Exception as erro:
+        print(f"  Falhou: {erro}")
+        return
+    print("  Sessao iniciada.")
+
+    todas = moodle.listar_disciplinas(sessao, url_base)
+    if listar:
+        print()
+        print(f"{len(todas)} disciplina(s) inscritas:")
+        for identificador, nome in todas:
+            print(f"  {identificador:>6}  {nome}")
+        return
+
+    if not todas:
+        print("  Nenhuma disciplina encontrada.")
+        return
+
+    raiz = Path("data") / "raw" / "psi9"
+    inicio = time.perf_counter()
+
+    def progresso(nome, quantos):
+        print(f"  {nome[:46]:<48} {quantos:>3} recursos")
+
+    print()
+    relatorio = moodle.sincronizar(
+        raiz,
+        disciplinas_pedidas=disciplinas,
+        intervalo=intervalo,
+        limite_por_disciplina=limite,
+        ao_progredir=progresso,
+    )
+    duracao = time.perf_counter() - inicio
+
+    print()
+    print(
+        f"{relatorio.ficheiros} ficheiros"
+        f" ({relatorio.bytes_totais / 1024 / 1024:.1f} MB)"
+        f" em {relatorio.pedidos} pedidos, {duracao:.0f}s"
+    )
+    for nome, quantos in sorted(
+        relatorio.disciplinas.items(), key=lambda p: -p[1]
+    ):
+        print(f"  {nome[:46]:<48} {quantos:>4}")
+
+    if relatorio.ignorados:
+        print()
+        print(f"Ignorados: {len(relatorio.ignorados)}")
+        motivos: dict[str, int] = {}
+        for _, motivo in relatorio.ignorados:
+            chave = motivo.split(":")[0]
+            motivos[chave] = motivos.get(chave, 0) + 1
+        for motivo, quantos in sorted(motivos.items(), key=lambda p: -p[1]):
+            print(f"  {motivo:<40} {quantos:>4}")
+
+    print()
+    print("Agora indexe: python main.py atualizar --sem-rastreio")
+
+
 def comando_disciplinas() -> None:
     if not CAMINHO_BANCO.exists():
         print("Indice nao encontrado. Rode antes: python main.py indexar <caminho>")
@@ -319,6 +393,22 @@ def main() -> None:
         "--sem-rastreio", action="store_true",
         help="so reindexa o que ja esta em data/raw",
     )
+    p_moodle = subcomandos.add_parser(
+        "moodle", help="sincroniza materiais das suas disciplinas do Moodle"
+    )
+    p_moodle.add_argument(
+        "--disciplina", action="append", dest="disciplinas",
+        help="filtra por nome (pode repetir); por omissao, todas",
+    )
+    p_moodle.add_argument("--intervalo", type=float, default=1.0)
+    p_moodle.add_argument(
+        "--limite", type=int, default=0,
+        help="max de recursos por disciplina (0 = sem limite)",
+    )
+    p_moodle.add_argument(
+        "--listar", action="store_true",
+        help="so mostra as disciplinas inscritas, nao descarrega nada",
+    )
 
     argumentos = analisador.parse_args()
     if argumentos.comando == "indexar":
@@ -342,6 +432,13 @@ def main() -> None:
         )
     elif argumentos.comando == "estatisticas":
         comando_estatisticas()
+    elif argumentos.comando == "moodle":
+        comando_moodle(
+            argumentos.disciplinas,
+            argumentos.intervalo,
+            argumentos.limite,
+            argumentos.listar,
+        )
     elif argumentos.comando == "atualizar":
         comando_atualizar(
             argumentos.url,
