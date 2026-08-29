@@ -214,7 +214,14 @@ def _processar(
     # Um titulo do manifesto (nome do recurso no Moodle) vale mais que o
     # nome do ficheiro guardado ou o ultimo segmento do URL.
     base = titulo_dado or Path(nome).stem
-    if not titulo_dado and origem.startswith(("http://", "https://")):
+    # O titulo so vem do URL quando o documento E a pagina/ficheiro desse
+    # URL. Dentro de um ZIP a origem e "<url-do-zip>!<ficheiro>", e o URL
+    # termina em "view.php" - o nome util e o do ficheiro interno.
+    if (
+        not titulo_dado
+        and "!" not in origem
+        and origem.startswith(("http://", "https://"))
+    ):
         base = titulo_de_url(origem) or base
     if extensao in EXTENSOES_HTML:
         origem = origem_declarada(dados) or origem

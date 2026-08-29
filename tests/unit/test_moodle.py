@@ -130,3 +130,42 @@ def test_paginas_do_moodle_sao_guardadas_como_html():
     assert "page" in moodle.MODULOS_HTML
     assert "book" in moodle.MODULOS_HTML
     assert "resource" not in moodle.MODULOS_HTML
+
+
+def test_titulo_perde_o_rotulo_de_tipo():
+    assert moodle._limpar_titulo("Sebenta modulo F5 Ficheiro") == "Sebenta modulo F5"
+    assert moodle._limpar_titulo("Guioes e Fichas Pasta") == "Guioes e Fichas"
+    assert moodle._limpar_titulo("Manual Arrays") == "Manual Arrays"
+
+
+def test_modulo_url_ficou_de_fora():
+    """Aponta para sites externos e dava a maioria dos 404."""
+    assert "url" not in moodle.MODULOS_UTEIS
+
+
+def test_so_apanha_ligacoes_da_regiao_de_conteudo():
+    from bs4 import BeautifulSoup
+
+    html = """
+    <html><body>
+      <div id="block-region-side">
+        <a href="/mod/page/view.php?id=1">Anuncio do bloco lateral</a>
+      </div>
+      <div id="region-main">
+        <a href="/mod/resource/view.php?id=2">Sebenta Ficheiro</a>
+      </div>
+    </body></html>
+    """
+
+    class Falsa:
+        text = html
+        status_code = 200
+
+    class SessaoFalsa:
+        def get(self, *a, **k):
+            return Falsa()
+
+    _, recursos = moodle.pagina_da_disciplina(SessaoFalsa(), "https://x", 1)
+    identificadores = [r[1] for r in recursos]
+    assert 2 in identificadores
+    assert 1 not in identificadores

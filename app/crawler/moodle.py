@@ -33,7 +33,9 @@ VAR_SENHA = "MOODLE_SENHA"
 
 # Modulos que contem material para indexar. Foruns, questionarios e chats
 # ficam de fora: sao conversas e avaliacoes, nao material de estudo.
-MODULOS_UTEIS = ("resource", "folder", "page", "book", "url")
+# "url" ficou de fora: aponta para sites externos, que nao sao conteudo
+# da escola e davam a maioria dos 404.
+MODULOS_UTEIS = ("resource", "folder", "page", "book")
 # Modulos escritos dentro do proprio Moodle: guardam-se como HTML.
 MODULOS_HTML = ("page", "book")
 
@@ -163,9 +165,18 @@ def pagina_da_disciplina(
     if not nome and sopa.title:
         nome = sopa.title.get_text(strip=True).split("|")[0].strip()
 
+    # So a regiao de conteudo: blocos e navegacao lateral aparecem em
+    # todas as disciplinas e traziam o mesmo recurso 12 vezes.
+    conteudo = (
+        sopa.find(id="region-main")
+        or sopa.find("div", class_="course-content")
+        or sopa.find("section", id="region-main")
+        or sopa
+    )
+
     encontrados: list[tuple[str, int, str]] = []
     vistos: set[tuple[str, int]] = set()
-    for ligacao in sopa.find_all("a", href=True):
+    for ligacao in conteudo.find_all("a", href=True):
         casado = re.search(r"/mod/([a-z]+)/view\.php\?id=(\d+)", ligacao["href"])
         if not casado:
             continue
@@ -173,11 +184,27 @@ def pagina_da_disciplina(
         if modulo not in MODULOS_UTEIS or (modulo, identificador) in vistos:
             continue
         vistos.add((modulo, identificador))
-        texto = " ".join(ligacao.get_text(" ", strip=True).split())
+        texto = _limpar_titulo(ligacao.get_text(" ", strip=True))
         encontrados.append(
             (modulo, identificador, texto or f"{modulo}-{identificador}")
         )
     return nome, encontrados
+
+
+_ROTULOS_DE_TIPO = (
+    "Ficheiro", "Pasta", "Pagina", "Página", "Livro", "URL",
+    "File", "Folder", "Page", "Book",
+)
+
+
+def _limpar_titulo(texto: str) -> str:
+    """O Moodle acrescenta o tipo ao nome: "Sebenta F5 Ficheiro"."""
+    limpo = " ".join(texto.split())
+    for rotulo in _ROTULOS_DE_TIPO:
+        if limpo.endswith(" " + rotulo):
+            limpo = limpo[: -len(rotulo)].strip()
+            break
+    return limpo
 
 
 def _nome_da_resposta(resposta, alternativa: str) -> str:
@@ -292,7 +319,7 @@ def descarregar_recurso(
         )
     if resposta is None or resposta.status_code != 200:
         codigo = resposta.status_code if resposta is not None else "sem resposta"
-        relatorio.ignorar(rotulo, f"estado HTTP {codigo}")
+        relatorio.ignorar(rotulo, f"{modulo}: estado HTTP {codigo}")
         return
 
     tipo = resposta.headers.get("Content-Type", "")
@@ -303,7 +330,7 @@ def descarregar_recurso(
                 rotulo, titulo,
             )
         else:
-            relatorio.ignorar(rotulo, "pagina, nao ficheiro")
+            relatorio.ignorar(rotulo, f"{modulo}: pagina, nao ficheiro")
         return
 
     nome = _nome_da_resposta(resposta, f"{rotulo}.bin")

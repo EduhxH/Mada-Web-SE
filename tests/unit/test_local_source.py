@@ -129,3 +129,66 @@ def test_titulo_a_partir_do_url():
     ) == "REGULAMENTO INTERNO APROVADO"
     assert titulo_de_url("https://www.sefo.pt/oferta-formativa/cursos/") == "cursos"
     assert titulo_de_url("https://www.sefo.pt/") == ""
+
+
+def test_titulo_de_ficheiro_dentro_de_zip_usa_o_nome_interno(tmp_path):
+    """A origem de uma entrada de ZIP e "<url>!<ficheiro>": o titulo util e o
+    nome do ficheiro, nao o ultimo segmento do URL (que da "view.php")."""
+    import io
+    import json
+    import zipfile
+
+    memoria = io.BytesIO()
+    with zipfile.ZipFile(memoria, "w") as z:
+        z.writestr("Sebenta modulo F5.txt", "radiacao e temperatura")
+    pasta = tmp_path / "Fisica"
+    _criar(pasta, "material.zip", memoria.getvalue())
+    (pasta / "_origens.json").write_text(
+        json.dumps(
+            {
+                "material.zip": {
+                    "url": "https://moodle.sefo.pt/mod/folder/view.php?id=99",
+                    "titulo": "Guioes e Fichas",
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    documentos, _ = carregar(tmp_path)
+    assert [d.titulo for d in documentos] == ["Sebenta modulo F5"]
+    assert "view.php" not in documentos[0].titulo
+
+
+def test_titulo_do_manifesto_usado_em_ficheiro_solto(tmp_path):
+    import json
+
+    pasta = tmp_path / "Fisica"
+    _criar(pasta, "guardado.txt", b"conteudo qualquer aqui")
+    (pasta / "_origens.json").write_text(
+        json.dumps(
+            {
+                "guardado.txt": {
+                    "url": "https://moodle.sefo.pt/mod/resource/view.php?id=7",
+                    "titulo": "Sebenta modulo F5",
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    documentos, _ = carregar(tmp_path)
+    assert documentos[0].titulo == "Sebenta modulo F5"
+
+
+def test_manifesto_no_formato_antigo_continua_a_funcionar(tmp_path):
+    import json
+
+    pasta = tmp_path / "Escola"
+    _criar(pasta, "pagina.txt", b"texto da pagina do site")
+    (pasta / "_origens.json").write_text(
+        json.dumps({"pagina.txt": "https://www.sefo.pt/regulamento-interno.pdf"}),
+        encoding="utf-8",
+    )
+    documentos, _ = carregar(tmp_path)
+    assert documentos[0].origem.startswith("https://")
+    assert documentos[0].titulo == "regulamento interno"
