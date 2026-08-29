@@ -169,3 +169,67 @@ def test_so_apanha_ligacoes_da_regiao_de_conteudo():
     identificadores = [r[1] for r in recursos]
     assert 2 in identificadores
     assert 1 not in identificadores
+
+
+def test_ligacoes_de_ficheiro_apanha_pluginfile():
+    from bs4 import BeautifulSoup
+
+    html = """
+    <div>
+      <a href="https://m/pluginfile.php/1/mod_folder/content/0/Ficha%203.pdf">
+        Ficha 3 Ficheiro</a>
+      <a href="/mod/folder/view.php?id=9">nao e ficheiro</a>
+      <a href="https://m/pluginfile.php/1/mod_folder/content/0/Sebenta.pdf">
+        Sebenta</a>
+    </div>
+    """
+    encontradas = moodle._ligacoes_de_ficheiro(BeautifulSoup(html, "html.parser"))
+    assert len(encontradas) == 2
+    assert encontradas[0][1] == "Ficha 3"
+
+
+def test_ligacoes_de_ficheiro_sem_duplicados():
+    from bs4 import BeautifulSoup
+
+    html = """
+    <div>
+      <a href="https://m/pluginfile.php/1/a/Ficha.pdf">Ficha</a>
+      <a href="https://m/pluginfile.php/1/a/Ficha.pdf">Ficha (icone)</a>
+    </div>
+    """
+    assert len(moodle._ligacoes_de_ficheiro(BeautifulSoup(html, "html.parser"))) == 1
+
+
+def test_nome_guardado_e_estavel_entre_execucoes():
+    """A chave nao inclui sesskey: o mesmo ficheiro nao pode mudar de nome,
+    senao aparece duas vezes no indice."""
+    from app.crawler.web_source import nome_ficheiro
+
+    chave = "folder-82160-Sebenta modulo F5.pdf"
+    assert nome_ficheiro(chave, ".pdf") == nome_ficheiro(chave, ".pdf")
+
+
+def test_extensao_recusada_nao_e_guardada(tmp_path):
+    relatorio = moodle.RelatorioMoodle()
+    origens = {}
+    guardou = moodle._guardar_bytes(
+        b"dados", "folha.xlsx", "chave", "https://m/x", "Folha",
+        tmp_path, origens, relatorio, "Fisica",
+    )
+    assert guardou is False
+    assert origens == {}
+    assert relatorio.ficheiros == 0
+
+
+def test_ficheiro_aceite_entra_no_manifesto(tmp_path):
+    relatorio = moodle.RelatorioMoodle()
+    origens = {}
+    assert moodle._guardar_bytes(
+        b"%PDF-1.4 conteudo", "Sebenta.pdf", "folder-1-Sebenta.pdf",
+        "https://m/mod/folder/view.php?id=1", "Sebenta F5",
+        tmp_path, origens, relatorio, "Fisica",
+    )
+    (guardado,) = origens
+    assert origens[guardado]["titulo"] == "Sebenta F5"
+    assert (tmp_path / guardado).read_bytes().startswith(b"%PDF")
+    assert relatorio.disciplinas["Fisica"] == 1

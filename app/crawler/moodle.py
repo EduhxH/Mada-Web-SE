@@ -15,7 +15,7 @@ import re
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 import requests
 from bs4 import BeautifulSoup
@@ -245,7 +245,7 @@ def _guardar_html(
     marcador = f'<meta name="madalena-origem" content="{alvo}">'
     html = f"<html><head>{marcador}</head><body>{principal}</body></html>"
     destino.mkdir(parents=True, exist_ok=True)
-    guardado = nome_ficheiro(alvo, ".html")
+    guardado = nome_ficheiro(alvo.split("&")[0], ".html")
     (destino / guardado).write_text(html, encoding="utf-8")
     origens[guardado] = {"url": alvo, "titulo": titulo or alternativa}
     _registar(relatorio, disciplina, len(html))
@@ -284,6 +284,97 @@ def _seguir_pluginfile(
     return None
 
 
+def _ligacoes_de_ficheiro(sopa) -> list[tuple[str, str]]:
+    """(url, nome) de cada pluginfile.php na pagina."""
+    encontradas = []
+    vistas = set()
+    for ligacao in sopa.find_all("a", href=True):
+        endereco = ligacao["href"]
+        if "pluginfile.php" not in endereco or endereco in vistas:
+            continue
+        vistas.add(endereco)
+        nome = unquote(Path(urlparse(endereco).path).name)
+        texto = _limpar_titulo(ligacao.get_text(" ", strip=True))
+        encontradas.append((endereco, texto or nome))
+    return encontradas
+
+
+def _guardar_bytes(
+    conteudo: bytes,
+    nome: str,
+    chave: str,
+    url_publico: str,
+    titulo: str,
+    destino: Path,
+    origens: dict,
+    relatorio: RelatorioMoodle,
+    disciplina: str,
+) -> bool:
+    extensao = Path(nome).suffix.lower()
+    if extensao and extensao not in EXTENSOES_ACEITES:
+        relatorio.ignorar(nome, f"extensao {extensao} nao aceite")
+        return False
+    destino.mkdir(parents=True, exist_ok=True)
+    # A chave do nome nao inclui sesskey nem parametros volateis: o mesmo
+    # ficheiro tem de ficar sempre com o mesmo nome entre execucoes.
+    guardado = nome_ficheiro(chave, extensao or ".bin")
+    (destino / guardado).write_bytes(conteudo)
+    origens[guardado] = {"url": url_publico, "titulo": titulo or Path(nome).stem}
+    _registar(relatorio, disciplina, len(conteudo))
+    return True
+
+
+def _descarregar_pasta(
+    sessao: requests.Session,
+    url_base: str,
+    identificador: int,
+    destino: Path,
+    origens: dict,
+    relatorio: RelatorioMoodle,
+    disciplina: str,
+    intervalo: float,
+) -> None:
+    """Abre a pagina da pasta e descarrega cada ficheiro individualmente.
+
+    O download_folder.php do Moodle e servido por POST com sesskey; seguir os
+    ficheiros um a um funciona em qualquer versao e da nomes melhores.
+    """
+    publico = f"{url_base}/mod/folder/view.php?id={identificador}"
+    try:
+        pagina = sessao.get(publico, timeout=TEMPO_LIMITE)
+        relatorio.pedidos += 1
+    except requests.RequestException as erro:
+        relatorio.ignorar(f"folder-{identificador}", f"folder: erro de rede {erro}")
+        return
+    if pagina.status_code != 200:
+        relatorio.ignorar(
+            f"folder-{identificador}", f"folder: estado HTTP {pagina.status_code}"
+        )
+        return
+
+    ficheiros = _ligacoes_de_ficheiro(BeautifulSoup(pagina.text, "html.parser"))
+    if not ficheiros:
+        relatorio.ignorar(f"folder-{identificador}", "folder: sem ficheiros")
+        return
+
+    for endereco, titulo in ficheiros:
+        time.sleep(intervalo)
+        try:
+            resposta = sessao.get(endereco, timeout=TEMPO_LIMITE)
+            relatorio.pedidos += 1
+        except requests.RequestException:
+            relatorio.ignorar(titulo, "folder: erro de rede")
+            continue
+        if resposta.status_code != 200:
+            relatorio.ignorar(titulo, f"folder: estado HTTP {resposta.status_code}")
+            continue
+        nome = _nome_da_resposta(resposta, f"{titulo}.bin")
+        _guardar_bytes(
+            resposta.content, nome, f"folder-{identificador}-{nome}",
+            publico, titulo, destino, origens, relatorio, disciplina,
+        )
+
+
 def descarregar_recurso(
     sessao: requests.Session,
     url_base: str,
@@ -295,25 +386,28 @@ def descarregar_recurso(
     disciplina: str,
     sesskey: str = "",
     titulo: str = "",
+    intervalo: float = INTERVALO_PADRAO,
 ) -> None:
     rotulo = f"{modulo}-{identificador}"
-    if modulo == "folder":
-        alvo = f"{url_base}/mod/folder/download_folder.php?id={identificador}"
-        if sesskey:
-            alvo += f"&sesskey={sesskey}"
-    else:
-        alvo = f"{url_base}/mod/{modulo}/view.php?id={identificador}&redirect=1"
 
-    try:
-        resposta = sessao.get(alvo, timeout=TEMPO_LIMITE, allow_redirects=True)
-        relatorio.pedidos += 1
-    except requests.RequestException as erro:
-        relatorio.ignorar(rotulo, f"erro de rede: {erro}")
+    if modulo == "folder":
+        _descarregar_pasta(
+            sessao, url_base, identificador, destino, origens, relatorio,
+            disciplina, intervalo,
+        )
         return
 
-    if resposta.status_code != 200 and modulo != "folder":
-        # Nem todos os recursos aceitam redirect=1. Abre-se a pagina do
-        # recurso e segue-se a ligacao real do ficheiro (pluginfile).
+    publico = f"{url_base}/mod/{modulo}/view.php?id={identificador}"
+    try:
+        resposta = sessao.get(
+            f"{publico}&redirect=1", timeout=TEMPO_LIMITE, allow_redirects=True
+        )
+        relatorio.pedidos += 1
+    except requests.RequestException as erro:
+        relatorio.ignorar(rotulo, f"{modulo}: erro de rede {erro}")
+        return
+
+    if resposta.status_code != 200:
         resposta = _seguir_pluginfile(
             sessao, url_base, modulo, identificador, relatorio
         )
@@ -326,7 +420,7 @@ def descarregar_recurso(
     if "text/html" in tipo:
         if modulo in MODULOS_HTML:
             _guardar_html(
-                resposta, alvo, destino, origens, relatorio, disciplina,
+                resposta, publico, destino, origens, relatorio, disciplina,
                 rotulo, titulo,
             )
         else:
@@ -334,19 +428,10 @@ def descarregar_recurso(
         return
 
     nome = _nome_da_resposta(resposta, f"{rotulo}.bin")
-    extensao = Path(nome).suffix.lower()
-    if extensao and extensao not in EXTENSOES_ACEITES:
-        relatorio.ignorar(nome, f"extensao {extensao} nao aceite")
-        return
-
-    destino.mkdir(parents=True, exist_ok=True)
-    guardado = nome_ficheiro(f"{alvo}#{nome}", extensao or ".bin")
-    (destino / guardado).write_bytes(resposta.content)
-    origens[guardado] = {
-        "url": f"{url_base}/mod/{modulo}/view.php?id={identificador}",
-        "titulo": titulo or Path(nome).stem,
-    }
-    _registar(relatorio, disciplina, len(resposta.content))
+    _guardar_bytes(
+        resposta.content, nome, f"{modulo}-{identificador}-{nome}",
+        publico, titulo, destino, origens, relatorio, disciplina,
+    )
 
 
 def pasta_da_disciplina(nome: str) -> str:
@@ -438,7 +523,7 @@ def sincronizar(
             ultimo = time.monotonic()
             descarregar_recurso(
                 sessao, url_base, modulo, recurso, pasta, origens, relatorio,
-                nome, sesskey, titulo_recurso,
+                nome, sesskey, titulo_recurso, intervalo,
             )
 
         if origens:
