@@ -88,10 +88,18 @@ def carregar(caminho: str | Path) -> tuple[list[Documento], Relatorio]:
         pasta = arquivo.parent
         if pasta not in manifestos:
             manifestos[pasta] = _ler_manifesto(pasta)
+        entrada = manifestos[pasta].get(arquivo.name)
+        if isinstance(entrada, dict):
+            origem_do_ficheiro = entrada.get("url") or str(arquivo)
+            titulo_do_manifesto = entrada.get("titulo") or ""
+        else:
+            origem_do_ficheiro = entrada or str(arquivo)
+            titulo_do_manifesto = ""
         _processar(
             nome=arquivo.name,
             dados=arquivo.read_bytes(),
-            origem=manifestos[pasta].get(arquivo.name, str(arquivo)),
+            origem=origem_do_ficheiro,
+            titulo_dado=titulo_do_manifesto,
             disciplina=_disciplina(raiz, arquivo),
             documentos=documentos,
             relatorio=relatorio,
@@ -167,6 +175,7 @@ def _processar(
     disciplina: str,
     documentos: list[Documento],
     relatorio: Relatorio,
+    titulo_dado: str = "",
     vistos: set[int] | None = None,
     dentro_de_zip: bool = False,
 ) -> None:
@@ -202,8 +211,10 @@ def _processar(
         relatorio.ignorar(origem, MOTIVO_SEM_TEXTO)
         return
 
-    base = Path(nome).stem
-    if origem.startswith(("http://", "https://")):
+    # Um titulo do manifesto (nome do recurso no Moodle) vale mais que o
+    # nome do ficheiro guardado ou o ultimo segmento do URL.
+    base = titulo_dado or Path(nome).stem
+    if not titulo_dado and origem.startswith(("http://", "https://")):
         base = titulo_de_url(origem) or base
     if extensao in EXTENSOES_HTML:
         origem = origem_declarada(dados) or origem

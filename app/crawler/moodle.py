@@ -207,6 +207,7 @@ def _guardar_html(
     relatorio: RelatorioMoodle,
     disciplina: str,
     alternativa: str,
+    titulo: str = "",
 ) -> None:
     """Uma 'page' ou 'book' do Moodle e material escrito no proprio Moodle."""
     sopa = BeautifulSoup(resposta.text, "html.parser")
@@ -219,8 +220,41 @@ def _guardar_html(
     destino.mkdir(parents=True, exist_ok=True)
     guardado = nome_ficheiro(alvo, ".html")
     (destino / guardado).write_text(html, encoding="utf-8")
-    origens[guardado] = alvo
+    origens[guardado] = {"url": alvo, "titulo": titulo or alternativa}
     _registar(relatorio, disciplina, len(html))
+
+
+def _seguir_pluginfile(
+    sessao: requests.Session,
+    url_base: str,
+    modulo: str,
+    identificador: int,
+    relatorio: RelatorioMoodle,
+):
+    """Abre a pagina do recurso e descarrega o ficheiro que ela aponta."""
+    try:
+        pagina = sessao.get(
+            f"{url_base}/mod/{modulo}/view.php?id={identificador}",
+            timeout=TEMPO_LIMITE,
+        )
+        relatorio.pedidos += 1
+    except requests.RequestException:
+        return None
+    if pagina.status_code != 200:
+        return None
+
+    sopa = BeautifulSoup(pagina.text, "html.parser")
+    for ligacao in sopa.find_all("a", href=True):
+        if "pluginfile.php" not in ligacao["href"]:
+            continue
+        try:
+            ficheiro = sessao.get(ligacao["href"], timeout=TEMPO_LIMITE)
+            relatorio.pedidos += 1
+        except requests.RequestException:
+            return None
+        if ficheiro.status_code == 200:
+            return ficheiro
+    return None
 
 
 def descarregar_recurso(
@@ -233,6 +267,7 @@ def descarregar_recurso(
     relatorio: RelatorioMoodle,
     disciplina: str,
     sesskey: str = "",
+    titulo: str = "",
 ) -> None:
     rotulo = f"{modulo}-{identificador}"
     if modulo == "folder":
@@ -249,15 +284,23 @@ def descarregar_recurso(
         relatorio.ignorar(rotulo, f"erro de rede: {erro}")
         return
 
-    if resposta.status_code != 200:
-        relatorio.ignorar(rotulo, f"estado HTTP {resposta.status_code}")
+    if resposta.status_code != 200 and modulo != "folder":
+        # Nem todos os recursos aceitam redirect=1. Abre-se a pagina do
+        # recurso e segue-se a ligacao real do ficheiro (pluginfile).
+        resposta = _seguir_pluginfile(
+            sessao, url_base, modulo, identificador, relatorio
+        )
+    if resposta is None or resposta.status_code != 200:
+        codigo = resposta.status_code if resposta is not None else "sem resposta"
+        relatorio.ignorar(rotulo, f"estado HTTP {codigo}")
         return
 
     tipo = resposta.headers.get("Content-Type", "")
     if "text/html" in tipo:
         if modulo in MODULOS_HTML:
             _guardar_html(
-                resposta, alvo, destino, origens, relatorio, disciplina, rotulo
+                resposta, alvo, destino, origens, relatorio, disciplina,
+                rotulo, titulo,
             )
         else:
             relatorio.ignorar(rotulo, "pagina, nao ficheiro")
@@ -272,17 +315,33 @@ def descarregar_recurso(
     destino.mkdir(parents=True, exist_ok=True)
     guardado = nome_ficheiro(f"{alvo}#{nome}", extensao or ".bin")
     (destino / guardado).write_bytes(resposta.content)
-    origens[guardado] = f"{url_base}/mod/{modulo}/view.php?id={identificador}"
+    origens[guardado] = {
+        "url": f"{url_base}/mod/{modulo}/view.php?id={identificador}",
+        "titulo": titulo or Path(nome).stem,
+    }
     _registar(relatorio, disciplina, len(resposta.content))
 
 
 def pasta_da_disciplina(nome: str) -> str:
-    limpo = re.sub(r"^PSI\d+\s*[-:]\s*", "", nome)
-    limpo = re.sub(r"^Disciplina de\s+", "", limpo, flags=re.IGNORECASE)
+    """Nome de pasta a partir do titulo da disciplina no Moodle.
+
+    Os titulos vem em formas variadas: "Disciplina de Matematica",
+    "Disciplina: PSI9-Arquitetura de Computadores", "PSI9-Ingles". Repete-se
+    a limpeza ate estabilizar, porque os prefixos aparecem encadeados.
+    Devolve "" quando nao sobra nada util, para quem chama decidir.
+    """
+    limpo = nome
+    for _ in range(3):
+        anterior = limpo
+        limpo = re.sub(r"^Disciplina\s*(?:de|:)\s*", "", limpo, flags=re.IGNORECASE)
+        limpo = re.sub(r"^PSI\d+\s*[-:]\s*", "", limpo)
+        limpo = limpo.strip()
+        if limpo == anterior:
+            break
     limpo = _PROIBIDOS_EM_NOME.sub("-", limpo)
-    limpo = limpo.replace("…", "")
-    limpo = limpo.strip().rstrip(". ")
-    return limpo[:60].strip().rstrip(". ") or "disciplina"
+    limpo = limpo.replace("\u2026", "")
+    limpo = limpo.strip().strip(". ")
+    return limpo[:60].strip().strip(". ")
 
 
 # nome antigo, mantido para nao partir chamadas existentes
@@ -331,8 +390,13 @@ def sincronizar(
             sessao, url_base, identificador
         )
         relatorio.pedidos += 1
-        nome = nome_completo or nome_curto
-        pasta = raiz / pasta_da_disciplina(nome)
+        # O h1 e mais fiavel, mas ha disciplinas com titulos inuteis
+        # ("Disciplina de ....."): nesse caso vale o nome da lista.
+        pasta_nome = pasta_da_disciplina(nome_completo)
+        if not pasta_nome:
+            pasta_nome = pasta_da_disciplina(nome_curto) or "disciplina"
+        nome = pasta_nome
+        pasta = raiz / pasta_nome
         origens: dict[str, str] = {}
 
         if limite_por_disciplina:
@@ -340,14 +404,14 @@ def sincronizar(
         if ao_progredir:
             ao_progredir(nome, len(recursos))
 
-        for modulo, recurso, _ in recursos:
+        for modulo, recurso, titulo_recurso in recursos:
             espera = intervalo - (time.monotonic() - ultimo)
             if espera > 0:
                 time.sleep(espera)
             ultimo = time.monotonic()
             descarregar_recurso(
                 sessao, url_base, modulo, recurso, pasta, origens, relatorio,
-                nome, sesskey,
+                nome, sesskey, titulo_recurso,
             )
 
         if origens:

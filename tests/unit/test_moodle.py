@@ -77,9 +77,17 @@ def test_pasta_remove_reticencias_unicode():
     assert "\u2026" not in moodle.pasta_da_disciplina("Tecnologias de Informa\u2026")
 
 
-def test_pasta_nunca_fica_vazia():
-    assert moodle.pasta_da_disciplina("...") == "disciplina"
-    assert moodle.pasta_da_disciplina("///") != ""
+def test_pasta_vazia_quando_nao_sobra_nada():
+    """Devolve "" para quem chama poder usar o nome da lista em vez disso."""
+    assert moodle.pasta_da_disciplina("...") == ""
+    assert moodle.pasta_da_disciplina("Disciplina de .....") == ""
+
+
+def test_prefixos_encadeados_sao_todos_removidos():
+    assert moodle.pasta_da_disciplina(
+        "Disciplina: PSI9-Arquitetura de Computadores"
+    ) == "Arquitetura de Computadores"
+    assert moodle.pasta_da_disciplina("Disciplina: Turma PSI9") == "Turma PSI9"
 
 
 def test_sesskey_extraido_do_javascript():
