@@ -6,7 +6,7 @@ from pathlib import Path
 from app.crawler.local_source import MOTIVO_PRIVADO, Relatorio, carregar
 from app.crawler.web_source import rastrear
 from app.analytics import uso
-from app.indexing import storage
+from app.indexing import atualizacao, storage
 from app.indexing.inverted_index import construir_indice
 from app.indexing.tokenizer import tokenizar
 from app.interface import auth
@@ -134,6 +134,64 @@ def comando_rastrear(url: str, pasta: str, paginas: int, profundidade: int,
     print(f"Agora indexe: python main.py indexar data/raw")
 
 
+def comando_atualizar(
+    url: str, paginas: int, intervalo: float, sem_rastreio: bool
+) -> None:
+    inicio = time.perf_counter()
+
+    if sem_rastreio:
+        print("A saltar o rastreio do site (--sem-rastreio).")
+    else:
+        print(f"1/2  A rastrear {url} (max {paginas} paginas)...")
+        relatorio_web = rastrear(
+            url,
+            Path("data") / "raw" / "Escola",
+            max_paginas=paginas,
+            intervalo=intervalo,
+        )
+        html = relatorio_web.guardadas - relatorio_web.pdfs
+        print(
+            f"     {relatorio_web.guardadas} guardadas"
+            f" ({html} HTML + {relatorio_web.pdfs} PDF)"
+            f" em {relatorio_web.pedidos} pedidos"
+        )
+
+    print("2/2  A reindexar o corpus completo...")
+    alteracoes, relatorio, termos = atualizacao.reindexar()
+    total = (
+        alteracoes.mantidos + len(alteracoes.novos) + len(alteracoes.alterados)
+    )
+    if not total:
+        print("     Nenhum documento encontrado.")
+        imprimir_relatorio(relatorio)
+        return
+
+    duracao = time.perf_counter() - inicio
+    print(f"     {total} documentos, {termos} termos unicos")
+    print()
+    print(f"Concluido em {duracao:.0f}s.  {alteracoes.resumo()}")
+
+    for rotulo, itens in (
+        ("Novos", alteracoes.novos),
+        ("Alterados", alteracoes.alterados),
+        ("Removidos", alteracoes.removidos),
+    ):
+        if not itens:
+            continue
+        print()
+        print(f"{rotulo} ({len(itens)}):")
+        for _, titulo in itens[:12]:
+            print(f"  {titulo[:70]}")
+        if len(itens) > 12:
+            print(f"  ... e mais {len(itens) - 12}")
+
+    if not alteracoes.houve_mudanca:
+        print()
+        print("O corpus esta igual ao da ultima atualizacao.")
+
+    imprimir_relatorio(relatorio)
+
+
 def comando_disciplinas() -> None:
     if not CAMINHO_BANCO.exists():
         print("Indice nao encontrado. Rode antes: python main.py indexar <caminho>")
@@ -245,6 +303,16 @@ def main() -> None:
     p_part.add_argument("--criar", type=int, default=0)
     p_part.add_argument("--revogar", help="rotulo a revogar, ex.: aluno-03")
     subcomandos.add_parser("estatisticas", help="resumo de utilizacao")
+    p_atual = subcomandos.add_parser(
+        "atualizar", help="rastreia o site, reindexa tudo e diz o que mudou"
+    )
+    p_atual.add_argument("--url", default="https://www.sefo.pt")
+    p_atual.add_argument("--paginas", type=int, default=400)
+    p_atual.add_argument("--intervalo", type=float, default=1.0)
+    p_atual.add_argument(
+        "--sem-rastreio", action="store_true",
+        help="so reindexa o que ja esta em data/raw",
+    )
 
     argumentos = analisador.parse_args()
     if argumentos.comando == "indexar":
@@ -264,6 +332,13 @@ def main() -> None:
         comando_participantes(argumentos.criar, argumentos.revogar)
     elif argumentos.comando == "estatisticas":
         comando_estatisticas()
+    elif argumentos.comando == "atualizar":
+        comando_atualizar(
+            argumentos.url,
+            argumentos.paginas,
+            argumentos.intervalo,
+            argumentos.sem_rastreio,
+        )
     else:
         modo_interativo()
 

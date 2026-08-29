@@ -1,5 +1,6 @@
 import hashlib
 import json
+import shutil
 import re
 import time
 import xml.etree.ElementTree as ET
@@ -154,7 +155,16 @@ def rastrear(
     intervalo: float = INTERVALO_PADRAO,
     usar_sitemap: bool = True,
     guardar_pdfs: bool = True,
+    substituir: bool = True,
 ) -> RelatorioRastreio:
+    # Escrever para uma pasta a parte e so trocar no fim: um rastreio
+    # interrompido nao destroi o corpus que ja funcionava, e paginas que
+    # desapareceram do site deixam de ficar la para sempre.
+    destino_final = Path(destino)
+    if substituir:
+        destino = destino_final.with_name(destino_final.name + '.novo')
+        if destino.exists():
+            shutil.rmtree(destino)
     url_inicial = normalizar(url_inicial)
     dominio = urlparse(url_inicial).netloc
     relatorio = RelatorioRastreio()
@@ -241,4 +251,14 @@ def rastrear(
                     fronteira.append((ligacao, profundidade + 1))
 
     _escrever_manifesto(destino, origens)
+
+    if substituir and relatorio.guardadas:
+        if destino_final.exists():
+            shutil.rmtree(destino_final)
+        destino.rename(destino_final)
+    elif substituir:
+        # nada guardado: nao mexer no que ja existia
+        if destino.exists():
+            shutil.rmtree(destino)
+
     return relatorio
