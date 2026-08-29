@@ -17,7 +17,6 @@
 
  The name **Madalena** was inspired by the name of my beloved girlfriend.
 
-🇧🇷 The study notes in `docs/` are written in Brazilian Portuguese.
 
 </div>
 
@@ -28,7 +27,7 @@
 > It is an educational vertical search engine: it indexes a controlled collection of documents. It will never call Google, Meta or Bing search APIs — every index entry and every ranking score is computed by code in this repository.
 
 > [!NOTE]
-> **Learning context:** Madalena is being built step by step to learn data structures, algorithms, Big O analysis, Python, SQL/SQLite, HTTP/HTML, crawling, parsing, tokenization, inverted indexes, boolean search, TF-IDF ranking and automated testing. Each stage is documented in `docs/` before and after being implemented.
+> **Scope:** Madalena is a vertical search engine for one school. Every component — crawler, tokenizer, inverted index, ranking, query processing — is implemented from scratch, and every design decision is backed by a measurement on the real corpus.
 
 ---
 
@@ -295,7 +294,6 @@ Mada-Web-SE/
 │   └── models/
 │       └── document.py          # Immutable Documento record
 ├── data/                        # Corpus, index, secrets — all git-ignored
-├── docs/                        # Design and study notes (pt)
 ├── scripts/comparar_busca.py    # Naive vs. indexed benchmark
 ├── tests/{unit,integration}/    # 287 tests
 ├── main.py                      # CLI entry point
@@ -363,24 +361,6 @@ Mada-Web-SE/
   excluded from the index and always will be.
 
 ---
-
-## 📚 Design Notes
-
-Every stage is written up in `docs/`, in Portuguese, with the measurements that
-drove each decision:
-
-| | |
-|---|---|
-| `01`–`03` | Architecture, data structures, Big O |
-| `04`–`05` | Implementation walkthrough, local web UI |
-| `06` | Source architecture: site, Moodle, Teams, and the ACL model |
-| `07`–`09` | Relevance, spelling correction, result preview |
-| `10`–`11` | Web crawler; closed beta access and usage metrics |
-| `12`–`13` | Query suggestions, discipline landing page |
-| `14` | POS tagging and topic-noise removal (three rounds, with rejected rules) |
-| `15`–`17` | Result sections, tolerant search, morphological expansion |
-| `18`–`19` | Stable document ids; one-command corpus update |
-| `20`–`22` | Security hardening; Moodle connector, and the seven bugs it took to work |
 
 ## 🧠 What I Learned
 
