@@ -80,3 +80,22 @@ def test_agrupar_lista_vazia():
 
 def test_titulo_de_chave_desconhecida():
     assert seccoes.titulo_da("inexistente") == ""
+
+
+def test_padrao_administrativo_e_partilhado():
+    """seccoes e temas usam a mesma definicao, vinda de models."""
+    from app.indexing.storage import PADROES_ADMINISTRATIVOS as no_storage
+    from app.models.classificacao import PADROES_ADMINISTRATIVOS as nos_models
+    from app.search.temas import PADROES_ADMINISTRATIVOS as nos_temas
+
+    assert no_storage is nos_models
+    assert nos_temas is nos_models
+
+
+def test_e_administrativo_respeita_fronteiras():
+    from app.models.classificacao import e_administrativo
+
+    assert e_administrativo("regulamento interno")
+    assert e_administrativo("ata da reuniao")
+    assert not e_administrativo("tratamento de dados")
+    assert not e_administrativo("sebenta modulo f5")

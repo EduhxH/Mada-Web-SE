@@ -11,6 +11,10 @@ import math
 
 from app.indexing import pos, storage
 from app.indexing.tokenizer import remover_acentos, tokenizar
+from app.models.classificacao import (
+    EXTENSOES_CODIGO,
+    PADROES_ADMINISTRATIVOS,
+)
 
 LIMITE_TEMAS = 18
 MINIMO_DOCUMENTOS_TEMA = 3
@@ -104,24 +108,6 @@ TERMOS_CODIGO = frozenset(
     dataset datatable datagrid textbox label button click_ event handler
     form_ forms_ params param async await yield lambda
     """.split()
-)
-
-# Titulos que denunciam documento administrativo, nao de conteudo
-# Ficheiros de codigo-fonte: o vocabulario e de identificadores, nao de
-# materia de estudo (txtnome, namespace, conn...).
-EXTENSOES_NAO_TEMATICAS = (".cs", ".designer", ".resx", ".config")
-
-PADROES_ADMINISTRATIVOS = (
-    "planificacao",
-    "planif",
-    "criterios",
-    "justificacao",
-    "agenda",
-    "dossier",
-    "sumario",
-    "matriz",
-    "regulamento",
-    "ata",
 )
 
 RUIDO_TECNICO = frozenset(
