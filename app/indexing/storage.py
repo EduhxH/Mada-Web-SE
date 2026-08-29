@@ -2,6 +2,7 @@ import sqlite3
 from pathlib import Path
 
 from app.indexing.tokenizer import remover_acentos
+from app.models.classificacao import EXTENSOES_CODIGO, PADROES_ADMINISTRATIVOS
 from app.models.document import Documento
 
 _ESQUEMA = """
@@ -184,10 +185,8 @@ def _filtro_administrativo(padroes, extensoes=()) -> str:
 def contar_por_disciplina(
     conexao: sqlite3.Connection, disciplina: str, apenas_conteudo: bool = False
 ) -> int:
-    from app.search.temas import EXTENSOES_NAO_TEMATICAS, PADROES_ADMINISTRATIVOS
-
     extra = (
-        _filtro_administrativo(PADROES_ADMINISTRATIVOS, EXTENSOES_NAO_TEMATICAS)
+        _filtro_administrativo(PADROES_ADMINISTRATIVOS, EXTENSOES_CODIGO)
         if apenas_conteudo
         else ""
     )
@@ -205,10 +204,8 @@ def df_na_disciplina(
 ) -> list[tuple[str, int, int]]:
     extra = ""
     if excluir_administrativos:
-        from app.search.temas import EXTENSOES_NAO_TEMATICAS, PADROES_ADMINISTRATIVOS
-
         extra = _filtro_administrativo(
-            PADROES_ADMINISTRATIVOS, EXTENSOES_NAO_TEMATICAS
+            PADROES_ADMINISTRATIVOS, EXTENSOES_CODIGO
         )
     na_disciplina = conexao.execute(
         "SELECT p.term_id, COUNT(*) FROM postings p"

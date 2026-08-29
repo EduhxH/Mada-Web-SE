@@ -1,0 +1,22 @@
+# Fins de linha: o Git guarda sempre LF, e o disco tambem fica com LF.
+# Sem esta regra, o Git adivinha ficheiro a ficheiro e avisa em cada commit
+# ("LF will be replaced by CRLF"). Pior: um editor que gravasse CRLF podia
+# produzir um diff gigante sem uma unica alteracao real.
+* text=auto eol=lf
+
+# Ficheiros binarios: nunca converter, nunca tentar mostrar diff de texto
+*.pdf   binary
+*.docx  binary
+*.pptx  binary
+*.xlsx  binary
+*.zip   binary
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.sqlite3 binary
+*.db    binary
+
+# Estatisticas de linguagem do GitHub: docs sao documentacao, nao codigo
+docs/**  linguist-documentation

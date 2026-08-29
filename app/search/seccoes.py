@@ -1,7 +1,7 @@
-import re
 from dataclasses import dataclass
 
 from app.indexing.tokenizer import remover_acentos
+from app.models.classificacao import e_administrativo
 
 HORARIOS = "horarios"
 MATERIAL = "material"
@@ -24,25 +24,13 @@ SECCOES = {
 
 DISCIPLINAS_HORARIO = frozenset({"horarios", "horario"})
 
-# Fronteiras de palavra para nao apanhar "ata" dentro de "data" ou
-# "matriz" dentro de outra coisa qualquer.
-_PADRAO_REGULAMENTO = re.compile(
-    r"\b("
-    r"regulament\w*|criterio\w*|planifica\w*|justificac\w*|matriz\w*|"
-    r"estatuto\w*|ata|atas|projeto educativo|politica\w*|privacidade|"
-    r"conduta|calendario\w*|circular\w*|comunicado\w*|aviso\w*|edital\w*|"
-    r"dossier\w*|agenda\w*|dossie\w*"
-    r")\b"
-)
-
-
 def classificar(doc) -> str:
     disciplina = remover_acentos(doc.disciplina.lower())
     if disciplina in DISCIPLINAS_HORARIO:
         return HORARIOS
 
     titulo = remover_acentos(doc.titulo.lower())
-    if _PADRAO_REGULAMENTO.search(titulo):
+    if e_administrativo(titulo):
         return REGULAMENTOS
 
     if doc.origem.startswith(("http://", "https://")):
