@@ -9,6 +9,7 @@ from urllib.parse import parse_qs, urlencode, urlparse
 
 from app.analytics import uso
 from app.indexing import storage
+from app.models import novidades
 from app.interface import auth, disciplina as pagina_disciplina, estatisticas, protecao
 from app.interface.preview import fragmento, resolver_origem
 from app.indexing.tokenizer import tokenizar
@@ -69,6 +70,11 @@ ul.dsc { list-style: none; padding: 0; margin: 0; font-size: 14px; line-height: 
 ul.dsc a { color: #24418c; text-decoration: none; }
 ul.dsc a:hover { text-decoration: underline; }
 .vezes { color: #aaa; font-size: 11px; }
+.novo { font-size: 13px; color: #555; background: #f5f2e8; border: 1px solid #e0d8c0; padding: 6px 10px; margin: 0 0 16px; }
+.novo a { color: #24418c; }
+ul.novo-lista { list-style: none; padding: 0; margin: 0; }
+ul.novo-lista li { padding: 6px 0; border-bottom: 1px solid #eee; font-size: 14px; }
+ul.novo-lista .quando { color: #999; font-size: 12px; margin-left: 6px; }
 footer { margin-top: 48px; border-top: 1px solid #ddd; padding-top: 10px; color: #aaa; font-size: 12px; }
 footer a { color: #aaa; }
 
@@ -93,6 +99,7 @@ footer a { color: #aaa; }
 <body>
 <h1><a href="/">Madalena</a></h1>
 <p class="sub">motor de busca escolar</p>
+$novidades
 <form action="/" method="get">
 <span class="campo"><input type="text" name="q" value="$consulta" autofocus autocomplete="off"><div id="sugestoes"></div></span>
 <select name="d">$opcoes</select>
@@ -506,6 +513,7 @@ def _montar_pagina(
             return _MODELO.substitute(
                 consulta="",
                 opcoes=_opcoes(disciplinas, disciplina),
+                novidades=_aviso_novidades(),
                 corpo=corpo,
             )
         if consulta:
@@ -531,7 +539,58 @@ def _montar_pagina(
     return _MODELO.substitute(
         consulta=html.escape(consulta, quote=True),
         opcoes=_opcoes(disciplinas, disciplina),
+        novidades=_aviso_novidades(),
         corpo=corpo,
+    )
+
+
+def _aviso_novidades() -> str:
+    """Uma linha discreta a dizer o que apareceu, se apareceu alguma coisa."""
+    try:
+        quantas = novidades.contar_recentes()
+    except OSError:
+        return ""
+    if not quantas:
+        return ""
+    palavra = "documento novo" if quantas == 1 else "documentos novos"
+    return (
+        f'<p class="novo">{quantas} {palavra} nos ultimos'
+        f' {novidades.DIAS_RECENTES} dias &middot;'
+        f' <a href="/novidades">ver quais</a></p>'
+    )
+
+
+def _disciplinas_disponiveis() -> list[str]:
+    if not CAMINHO_BANCO.exists():
+        return []
+    conexao = storage.abrir(CAMINHO_BANCO)
+    try:
+        return storage.listar_disciplinas(conexao)
+    finally:
+        conexao.close()
+
+
+def _pagina_novidades() -> str:
+    recentes = novidades.recentes()
+    if not recentes:
+        corpo = '<p class="vazio">Nada de novo nos ultimos dias.</p>'
+    else:
+        linhas = []
+        for item in recentes:
+            titulo = html.escape(item.titulo)
+            disciplina = html.escape(item.disciplina)
+            # Leva a busca ca dentro, nao ao Moodle: o url guardado e
+            # relativo ao Moodle e resolveria contra o servidor errado.
+            procura = urlencode({"q": item.titulo})
+            linhas.append(
+                f'<li><span class="disciplina">{disciplina}</span>'
+                f'<a href="/?{procura}">{titulo}</a>'
+                f'<span class="quando">{html.escape(item.data)}</span></li>'
+            )
+        corpo = f'<ul class="novo-lista">{"".join(linhas)}</ul>'
+    return (
+        f'<h2 class="sec">material novo</h2>{corpo}'
+        '<p class="voltar"><a href="/">voltar a busca</a></p>'
     )
 
 
@@ -654,6 +713,15 @@ class _Manipulador(BaseHTTPRequestHandler):
             return
         if url.path == "/preview":
             self._servir_preview(parametros, participante)
+            return
+        if url.path == "/novidades":
+            corpo = _MODELO.substitute(
+                consulta="",
+                opcoes=_opcoes(_disciplinas_disponiveis(), ""),
+                novidades="",
+                corpo=_pagina_novidades(),
+            )
+            self._responder(corpo.encode("utf-8"), "text/html; charset=utf-8")
             return
         if url.path == "/estatisticas":
             with uso.abrir() as registo:

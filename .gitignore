@@ -37,3 +37,7 @@ data/uso.sqlite3
 
 # Arvore de trabalho do ramo gh-pages (pagina de reencaminhamento)
 .gh-pages/
+
+# Registo de material novo do Moodle: estado local, nao versionado
+data/novidades.json
+data/verificacao.log

@@ -32,7 +32,7 @@ def test_pasta_da_disciplina_limpa_prefixos():
 
 def test_pasta_da_disciplina_remove_caracteres_invalidos():
     resultado = moodle._pasta_da_disciplina('Mat/emat*ica?')
-    for proibido in '<>:"/\|?*':
+    for proibido in r'<>:"/\|?*':
         assert proibido not in resultado
 
 
@@ -280,3 +280,163 @@ def test_ficheiros_da_mesma_pasta_tem_origens_distintas(tmp_path):
     assert len(urls) == 3
     assert len(set(urls)) == 3
     assert all(u.startswith(pasta_url) for u in urls)
+
+
+def _manifesto(pasta, registos):
+    import json
+
+    pasta.mkdir(parents=True, exist_ok=True)
+    (pasta / "_origens.json").write_text(
+        json.dumps(registos, ensure_ascii=False), encoding="utf-8"
+    )
+
+
+def test_modulos_conhecidos_lidos_dos_manifestos(tmp_path):
+    _manifesto(tmp_path / "TIC", {
+        "a.pdf": {"url": "https://m.pt/mod/resource/view.php?id=101", "titulo": "A"},
+        "b.pdf": {"url": "https://m.pt/mod/folder/view.php?id=202#b.pdf", "titulo": "B"},
+    })
+    _manifesto(tmp_path / "Fisica", {
+        "c.pdf": {"url": "https://m.pt/mod/resource/view.php?id=303", "titulo": "C"},
+    })
+    assert moodle.modulos_com_ficheiros(tmp_path) == {101, 202, 303}
+
+
+def test_modulos_conhecidos_aceita_manifesto_antigo(tmp_path):
+    """O formato antigo guardava o url como string, nao como dicionario."""
+    _manifesto(tmp_path / "Escola", {
+        "p.html": "https://m.pt/mod/page/view.php?id=404",
+    })
+    assert moodle.modulos_com_ficheiros(tmp_path) == {404}
+
+
+def test_modulos_conhecidos_ignora_manifesto_corrompido(tmp_path):
+    pasta = tmp_path / "TIC"
+    pasta.mkdir(parents=True)
+    (pasta / "_origens.json").write_text("{quebrado", encoding="utf-8")
+    _manifesto(tmp_path / "Fisica", {
+        "c.pdf": {"url": "https://m.pt/mod/resource/view.php?id=7", "titulo": "C"},
+    })
+    assert moodle.modulos_com_ficheiros(tmp_path) == {7}
+
+
+def test_sem_manifestos_nada_e_conhecido(tmp_path):
+    assert moodle.modulos_com_ficheiros(tmp_path) == set()
+
+
+def test_modulo_novo_constroi_o_url():
+    novo = moodle.ModuloNovo("TIC", "resource", 55, "Ficha 3")
+    assert novo.url == "/mod/resource/view.php?id=55"
+
+
+def test_filtrar_disciplinas_por_nome():
+    todas = [(1, "PSI9-Matemática"), (2, "PSI9-Português")]
+    assert moodle._filtrar_disciplinas(todas, ["matem"]) == [(1, "PSI9-Matemática")]
+    assert moodle._filtrar_disciplinas(todas, None) == todas
+
+
+def test_verificar_devolve_so_o_que_falta(tmp_path, monkeypatch):
+    """A deteccao compara o que o Moodle anuncia com o que ja esta ca."""
+    _manifesto(tmp_path / "TIC", {
+        "a.pdf": {"url": "https://m.pt/mod/resource/view.php?id=101", "titulo": "A"},
+    })
+
+    monkeypatch.setattr(
+        moodle, "configuracao", lambda: ("https://m.pt", "aluno", "x")
+    )
+    monkeypatch.setattr(moodle, "iniciar_sessao", lambda *a: object())
+    monkeypatch.setattr(
+        moodle, "listar_disciplinas", lambda *a: [(9, "PSI9-TIC")]
+    )
+    monkeypatch.setattr(
+        moodle,
+        "pagina_da_disciplina",
+        lambda *a: ("PSI9-TIC", [
+            ("resource", 101, "Ja ca esta"),
+            ("resource", 999, "Ficha nova"),
+        ]),
+    )
+
+    novos, vistos = moodle.verificar(tmp_path, intervalo=0)
+    assert vistos == 2
+    assert [n.identificador for n in novos] == [999]
+    assert novos[0].titulo == "Ficha nova"
+    assert novos[0].disciplina == "TIC"
+
+
+def test_verificar_sem_novidades(tmp_path, monkeypatch):
+    _manifesto(tmp_path / "TIC", {
+        "a.pdf": {"url": "https://m.pt/mod/resource/view.php?id=101", "titulo": "A"},
+    })
+    monkeypatch.setattr(
+        moodle, "configuracao", lambda: ("https://m.pt", "aluno", "x")
+    )
+    monkeypatch.setattr(moodle, "iniciar_sessao", lambda *a: object())
+    monkeypatch.setattr(
+        moodle, "listar_disciplinas", lambda *a: [(9, "PSI9-TIC")]
+    )
+    monkeypatch.setattr(
+        moodle,
+        "pagina_da_disciplina",
+        lambda *a: ("PSI9-TIC", [("resource", 101, "Ja ca esta")]),
+    )
+    novos, vistos = moodle.verificar(tmp_path, intervalo=0)
+    assert novos == []
+    assert vistos == 1
+
+
+def test_vistos_contam_como_conhecidos(tmp_path):
+    """Um modulo esteril fica marcado, para nao ser anunciado todos os dias."""
+    assert moodle.modulos_vistos(tmp_path) == set()
+    moodle.marcar_vistos(tmp_path, {500, 501})
+    assert moodle.modulos_vistos(tmp_path) == {500, 501}
+    # nao produziram ficheiro, logo nao estao nos manifestos
+    assert moodle.modulos_com_ficheiros(tmp_path) == set()
+    # mas contam como conhecidos, e e isso que a deteccao usa
+    assert moodle.modulos_conhecidos(tmp_path) == {500, 501}
+
+
+def test_marcar_vistos_acumula(tmp_path):
+    moodle.marcar_vistos(tmp_path, {1})
+    moodle.marcar_vistos(tmp_path, {2})
+    assert moodle.modulos_vistos(tmp_path) == {1, 2}
+
+
+def test_marcar_vistos_guarda_a_data(tmp_path):
+    import json
+    from datetime import date
+
+    moodle.marcar_vistos(tmp_path, {7})
+    registo = json.loads((tmp_path / moodle.NOME_VISTOS).read_text(encoding="utf-8"))
+    assert registo["7"] == date.today().isoformat()
+
+
+def test_vistos_corrompido_nao_derruba(tmp_path):
+    (tmp_path / moodle.NOME_VISTOS).write_text("{partido", encoding="utf-8")
+    assert moodle.modulos_vistos(tmp_path) == set()
+
+
+def test_marcar_vistos_vazio_nao_cria_ficheiro(tmp_path):
+    moodle.marcar_vistos(tmp_path, set())
+    assert not (tmp_path / moodle.NOME_VISTOS).exists()
+
+
+def test_verificar_ignora_modulo_ja_examinado(tmp_path, monkeypatch):
+    """O modulo esteril nao volta a ser anunciado depois de marcado."""
+    moodle.marcar_vistos(tmp_path, {999})
+
+    monkeypatch.setattr(
+        moodle, "configuracao", lambda: ("https://m.pt", "aluno", "x")
+    )
+    monkeypatch.setattr(moodle, "iniciar_sessao", lambda *a: object())
+    monkeypatch.setattr(
+        moodle, "listar_disciplinas", lambda *a: [(9, "PSI9-TIC")]
+    )
+    monkeypatch.setattr(
+        moodle,
+        "pagina_da_disciplina",
+        lambda *a: ("PSI9-TIC", [("folder", 999, "Pasta vazia")]),
+    )
+    novos, vistos = moodle.verificar(tmp_path, intervalo=0)
+    assert novos == []
+    assert vistos == 1

@@ -5,6 +5,7 @@ from pathlib import Path
 
 from app.crawler.local_source import MOTIVO_PRIVADO, Relatorio, carregar
 from app.crawler import moodle
+from app.models import novidades
 from app.crawler.web_source import rastrear
 from app.analytics import uso
 from app.indexing import atualizacao, storage
@@ -193,14 +194,94 @@ def comando_atualizar(
     imprimir_relatorio(relatorio)
 
 
+def comando_verificar_moodle(
+    disciplinas: list[str] | None, intervalo: float
+) -> int:
+    """Procura material novo e descarrega so esse.
+
+    Um pedido por disciplina em vez das centenas de uma sincronizacao
+    completa, para poder correr todos os dias sem incomodar o servidor da
+    escola. Devolve quantos documentos novos entraram.
+    """
+    raiz = Path("data") / "raw" / "psi9"
+    inicio = time.perf_counter()
+
+    try:
+        novos, vistos = moodle.verificar(raiz, disciplinas, intervalo)
+    except moodle.ErroMoodle as erro:
+        print(f"  {erro}")
+        return 0
+    except Exception as erro:
+        print(f"  Falhou a verificacao: {erro}")
+        return 0
+
+    duracao = time.perf_counter() - inicio
+    print(f"{vistos} modulos verificados em {duracao:.0f}s")
+
+    if not novos:
+        print("  Nada de novo.")
+        return 0
+
+    print()
+    print(f"{len(novos)} novidade(s):")
+    for item in novos:
+        print(f"  {item.disciplina[:26]:<28} {item.titulo[:44]}")
+
+    print()
+    print("A descarregar so o que e novo...")
+    antes = moodle.modulos_com_ficheiros(raiz)
+    relatorio = moodle.sincronizar(
+        raiz,
+        disciplinas_pedidas=disciplinas,
+        intervalo=intervalo,
+        apenas={item.identificador for item in novos},
+    )
+    print(
+        f"  {relatorio.ficheiros} ficheiros"
+        f" ({relatorio.bytes_totais / 1024 / 1024:.1f} MB)"
+    )
+
+    # Marcar tudo o que foi examinado, mesmo o que nao deu ficheiro: senao
+    # uma pasta vazia e anunciada como novidade todos os dias. A
+    # sincronizacao completa volta a tentar tudo, por isso nada fica perdido.
+    moodle.marcar_vistos(raiz, {item.identificador for item in novos})
+
+    produziram = moodle.modulos_com_ficheiros(raiz) - antes
+    esteris = len(novos) - len(produziram)
+    if esteris:
+        print(f"  {esteris} sem ficheiro (pasta vazia ou formato que nao lemos)")
+
+    guardadas = novidades.registar(
+        [
+            (item.disciplina, item.titulo, item.url)
+            for item in novos
+            if item.identificador in produziram
+        ]
+    )
+    if guardadas:
+        print(f"  {guardadas} registadas para mostrar na interface")
+
+    if not relatorio.ficheiros:
+        return 0
+
+    print()
+    print("Falta reindexar para ficarem pesquisaveis:")
+    print("  python main.py atualizar --sem-rastreio")
+    return relatorio.ficheiros
+
+
 def comando_moodle(
     disciplinas: list[str] | None, intervalo: float, limite: int,
-    listar: bool, diagnostico: bool = False,
+    listar: bool, diagnostico: bool = False, verificar: bool = False,
 ) -> None:
     try:
         url_base, utilizador, _ = moodle.configuracao()
     except moodle.ErroMoodle as erro:
         print(erro)
+        return
+
+    if verificar:
+        comando_verificar_moodle(disciplinas, intervalo)
         return
 
     if diagnostico:
@@ -430,6 +511,10 @@ def main() -> None:
         "--diagnostico", action="store_true",
         help="inspeciona a pagina de uma pasta e mostra a sua estrutura",
     )
+    p_moodle.add_argument(
+        "--verificar", action="store_true",
+        help="procura material novo e descarrega so esse (rapido)",
+    )
 
     argumentos = analisador.parse_args()
     if argumentos.comando == "indexar":
@@ -460,6 +545,7 @@ def main() -> None:
             argumentos.limite,
             argumentos.listar,
             argumentos.diagnostico,
+            argumentos.verificar,
         )
     elif argumentos.comando == "atualizar":
         comando_atualizar(

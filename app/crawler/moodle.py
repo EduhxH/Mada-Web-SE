@@ -11,6 +11,7 @@ navegar.
 
 import json
 import os
+from datetime import date
 import re
 import time
 from dataclasses import dataclass, field
@@ -509,26 +510,173 @@ def _escrever_manifesto(pasta: Path, origens: dict[str, str]) -> None:
     )
 
 
+_PADRAO_MODULO = re.compile(r"view\.php\?id=(\d+)")
+
+
+@dataclass(frozen=True)
+class ModuloNovo:
+    """Um modulo que esta no Moodle e ainda nao esta ca."""
+
+    disciplina: str
+    modulo: str
+    identificador: int
+    titulo: str
+
+    @property
+    def url(self) -> str:
+        return f"/mod/{self.modulo}/view.php?id={self.identificador}"
+
+
+NOME_VISTOS = "_modulos_vistos.json"
+
+
+def modulos_com_ficheiros(raiz: Path) -> set[int]:
+    """Modulos que produziram pelo menos um ficheiro, lidos dos manifestos.
+
+    O manifesto guarda o URL de origem de cada ficheiro, e o identificador do
+    modulo vem la dentro. Serve de memoria entre execucoes sem precisar de
+    outra base de dados.
+    """
+    conhecidos: set[int] = set()
+    for manifesto in raiz.rglob(NOME_MANIFESTO):
+        try:
+            registos = json.loads(manifesto.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            continue
+        for valor in registos.values():
+            url = valor.get("url", "") if isinstance(valor, dict) else valor
+            casado = _PADRAO_MODULO.search(url or "")
+            if casado:
+                conhecidos.add(int(casado.group(1)))
+    return conhecidos
+
+
+def modulos_vistos(raiz: Path) -> set[int]:
+    """Modulos que ja examinamos, tenham dado ficheiro ou nao.
+
+    Sem isto, um modulo esteril - pasta vazia, ligacao morta, formato que nao
+    lemos - ficava para sempre por baixar e seria anunciado como novidade
+    todos os dias. Sao a maioria: das centenas anunciadas pelo Moodle, so uma
+    fracao tem mesmo ficheiro por tras.
+
+    A sincronizacao completa volta a tentar tudo, portanto uma pasta que
+    entretanto se encha nao fica perdida.
+    """
+    caminho = raiz / NOME_VISTOS
+    if not caminho.exists():
+        return set()
+    try:
+        dados = json.loads(caminho.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return set()
+    if not isinstance(dados, dict):
+        return set()
+    return {int(chave) for chave in dados if str(chave).isdigit()}
+
+
+def marcar_vistos(raiz: Path, identificadores: set[int]) -> None:
+    """Guarda os modulos examinados, com a data em que o foram."""
+    if not identificadores:
+        return
+    caminho = raiz / NOME_VISTOS
+    registo: dict[str, str] = {}
+    if caminho.exists():
+        try:
+            lido = json.loads(caminho.read_text(encoding="utf-8"))
+            if isinstance(lido, dict):
+                registo = {str(k): str(v) for k, v in lido.items()}
+        except (json.JSONDecodeError, OSError):
+            registo = {}
+    hoje = date.today().isoformat()
+    for identificador in identificadores:
+        registo.setdefault(str(identificador), hoje)
+    raiz.mkdir(parents=True, exist_ok=True)
+    caminho.write_text(
+        json.dumps(registo, ensure_ascii=False, indent=1), encoding="utf-8"
+    )
+
+
+def modulos_conhecidos(raiz: Path) -> set[int]:
+    """Tudo o que ja passou por ca: com ficheiro ou examinado sem resultado."""
+    return modulos_com_ficheiros(raiz) | modulos_vistos(raiz)
+
+
+def verificar(
+    raiz: Path,
+    disciplinas_pedidas: list[str] | None = None,
+    intervalo: float = INTERVALO_PADRAO,
+) -> tuple[list[ModuloNovo], int]:
+    """Procura material novo sem descarregar nada.
+
+    Um pedido por disciplina, contra as centenas de uma sincronizacao
+    completa. Compara os modulos anunciados na pagina com os que ja temos.
+
+    Repare-se no que isto NAO ve: um professor que substitua o ficheiro
+    dentro de um recurso existente mantem o mesmo identificador, e portanto
+    passa despercebido aqui. Essa mudanca so aparece ao descarregar, e e o
+    reindexar que a deteta pela impressao digital do conteudo.
+
+    Devolve (novidades, total de modulos vistos).
+    """
+    url_base, utilizador, senha = configuracao()
+    sessao = iniciar_sessao(url_base, utilizador, senha)
+    conhecidos = modulos_conhecidos(raiz)
+
+    todas = _filtrar_disciplinas(
+        listar_disciplinas(sessao, url_base), disciplinas_pedidas
+    )
+
+    novidades: list[ModuloNovo] = []
+    vistos = 0
+    ultimo = 0.0
+    for identificador, nome_curto in todas:
+        espera = intervalo - (time.monotonic() - ultimo)
+        if espera > 0:
+            time.sleep(espera)
+        ultimo = time.monotonic()
+
+        nome_completo, recursos = pagina_da_disciplina(
+            sessao, url_base, identificador
+        )
+        disciplina = (
+            pasta_da_disciplina(nome_completo)
+            or pasta_da_disciplina(nome_curto)
+            or "disciplina"
+        )
+        vistos += len(recursos)
+        for modulo, recurso, titulo in recursos:
+            if recurso not in conhecidos:
+                novidades.append(ModuloNovo(disciplina, modulo, recurso, titulo))
+    return novidades, vistos
+
+
+def _filtrar_disciplinas(todas, pedidas: list[str] | None):
+    if not pedidas:
+        return todas
+    procurados = [d.lower() for d in pedidas]
+    return [
+        (identificador, nome)
+        for identificador, nome in todas
+        if any(p in nome.lower() for p in procurados)
+    ]
+
+
 def sincronizar(
     raiz: Path,
     disciplinas_pedidas: list[str] | None = None,
     intervalo: float = INTERVALO_PADRAO,
     limite_por_disciplina: int = 0,
     ao_progredir=None,
+    apenas: set[int] | None = None,
 ) -> RelatorioMoodle:
     url_base, utilizador, senha = configuracao()
     sessao = iniciar_sessao(url_base, utilizador, senha)
     sesskey = obter_sesskey(sessao, url_base)
     relatorio = RelatorioMoodle()
 
-    todas = listar_disciplinas(sessao, url_base)
-    if disciplinas_pedidas:
-        procurados = [d.lower() for d in disciplinas_pedidas]
-        todas = [
-            (identificador, nome)
-            for identificador, nome in todas
-            if any(p in nome.lower() for p in procurados)
-        ]
+    todas = _filtrar_disciplinas(
+        listar_disciplinas(sessao, url_base), disciplinas_pedidas
+    )
 
     ultimo = 0.0
     for identificador, nome_curto in todas:
@@ -545,10 +693,16 @@ def sincronizar(
         pasta = raiz / pasta_nome
         origens: dict[str, str] = {}
 
+        # Sincronizacao incremental: os manifestos juntam-se em vez de se
+        # substituirem, por isso saltar o que ja ca esta nao apaga registo.
+        if apenas is not None:
+            recursos = [r for r in recursos if r[1] in apenas]
         if limite_por_disciplina:
             recursos = recursos[:limite_por_disciplina]
         if ao_progredir:
             ao_progredir(nome, len(recursos))
+        if not recursos:
+            continue
 
         for modulo, recurso, titulo_recurso in recursos:
             espera = intervalo - (time.monotonic() - ultimo)

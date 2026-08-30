@@ -84,12 +84,14 @@ Zero search APIs. Every result is computed here.
 | 🌍 **Public Access via Tunnel** | Cloudflare Tunnel exposes the engine without opening a single router port — the app stays bound to `127.0.0.1` and `cloudflared` makes the outbound connection. Session cookies gain the `Secure` flag only when the request actually arrived over HTTPS, so local-network testing keeps working. | ✅ Done |
 | 🔗 **Stable Public Link** | `scripts/publicar_tunel.py` starts the tunnel, captures the freshly assigned address and republishes a redirect page to GitHub Pages, so the address handed to students never changes even though the tunnel's own name does. | ✅ Done |
 | 🎓 **Moodle Connector** | Authenticated session against the school's Moodle (credentials from a git-ignored `.env`), syncing 751 documents across 12 enrolled courses — resources, folders, pages and books only, never forums, quizzes or submissions. Ships with a `--diagnostico` mode that inspects real folder pages instead of guessing their HTML. | ✅ Done |
+| 🔔 **New-material Detection** | `moodle --verificar` polls one page per course — about 14 requests and 13 seconds, against the hundreds of a full sync — compares the modules on offer against what is already held, and downloads only what is genuinely new. Modules that yield nothing are remembered as examined, so barren folders are not re-announced every day. | ✅ Done |
+| 📰 **What's New** | Detected material surfaces in the interface as a discreet line on the search page and a dated listing at `/novidades`, each entry linking to a search for it. | ✅ Done |
 | 🔄 **One-command Update** | `python main.py atualizar` crawls the site, reindexes everything and reports what changed — new, modified, removed, unchanged. The crawler writes to a staging folder and swaps atomically, so an interrupted run never damages a working corpus. | ✅ Done |
 | 🔑 **Stable Document Ids** | Ids are derived from the document's origin, not from read order, so reindexing after new material arrives never shifts them — the recorded click history keeps pointing at the right documents. | ✅ Done |
 | 🔁 **Morphological Expansion** | Singular/plural variants are added to the query — rules propose, the index vocabulary decides, so nothing is ever invented. Fixes 25% of the vocabulary being duplicated by number, without the information loss of stemming. | ✅ Done |
 | ⬆️ **Title Boost** | A hit in the title outweighs one in the body — the title says what a document *is*, the body only what it mentions. Applied after ranking, at no extra I/O cost. | ✅ Done |
 | 📊 **TF-IDF Ranking** | TF = freq / doc length, IDF = log(N / df); rare terms weigh more, long documents don't win by length alone. | ✅ Done |
-| 🧪 **Oracle-verified Tests** | 314 pytest tests; the integration suite proves the index returns exactly what the naive search returns. | ✅ Done |
+| 🧪 **Oracle-verified Tests** | 339 pytest tests; the integration suite proves the index returns exactly what the naive search returns. | ✅ Done |
 | ⏱️ **Naive vs. Indexed Benchmark** | `scripts/comparar_busca.py` times both paths on the real corpus and checks they agree. | ✅ Done |
 | 💻 **CLI** | `indexar` / `buscar` subcommands plus an interactive prompt with context snippets. | ✅ Done |
 | 🖥️ **Local Web UI** | Plain, dependency-free search page (standard-library HTTP server, term highlighting): `python main.py web`. | ✅ Done |
@@ -290,7 +292,37 @@ Pass `--sem-publicar` to open the tunnel without touching GitHub. Note that
 Cloudflare offers **no uptime guarantee** on accountless tunnels; a named
 tunnel bound to your own domain is the durable option.
 
-**8. Tests, benchmark and usage stats**
+**8. Keep the corpus fresh automatically**
+
+Moodle offers no webhook to a student account, so freshness means asking —
+the trick is asking cheaply. `--verificar` fetches one page per course and
+compares what is on offer against what is already held:
+
+```bash
+.venv\Scripts\python main.py moodle --verificar
+```
+
+About 14 requests and 13 seconds, versus the hundreds and several minutes of
+a full sync. Only genuinely new modules are downloaded.
+
+Modules that yield no file — empty folders, dead links, formats not read —
+are recorded as examined so they are not re-announced daily. On this corpus
+that is 236 of 305 modules, which is exactly why the record is needed. A
+full `moodle` sync still retries them, so a folder filled in later is not
+lost.
+
+To run it unattended, point the Windows Task Scheduler at
+`scripts\verificar_diario.cmd`, which checks, syncs and reindexes, logging
+everything to `data\verificacao.log`:
+
+```bash
+schtasks /create /tn "Madalena - verificar Moodle" /tr "%CD%\scripts\verificar_diario.cmd" /sc daily /st 07:30
+```
+
+Anything found appears in the web interface, on the search page and at
+`/novidades`.
+
+**9. Tests, benchmark and usage stats**
 
 ```bash
 .venv\Scripts\python -m pytest
@@ -342,13 +374,15 @@ Mada-Web-SE/
 │   │   └── uso.py               # Usage event log and aggregations
 │   └── models/
 │       ├── document.py          # Immutable Documento record
+│       ├── novidades.py         # Record of newly-published material
 │       └── classificacao.py     # Shared patterns (breaks an import cycle)
 ├── data/                        # Corpus, index, secrets — all git-ignored
 ├── scripts/
 │   ├── comparar_busca.py        # Naive vs. indexed benchmark
 │   ├── publicar_tunel.py        # Tunnel + stable redirect page
+│   ├── verificar_diario.cmd     # Scheduled Moodle check + reindex
 │   └── pagina_publica.html      # Redirect page template
-├── tests/{unit,integration}/    # 314 tests
+├── tests/{unit,integration}/    # 339 tests
 ├── main.py                      # CLI entry point
 └── .env.example                 # Signing key and Moodle credentials
 ```
@@ -388,6 +422,7 @@ Mada-Web-SE/
 - [x] Authenticated Moodle connector syncing enrolled courses automatically
 - [x] Hardening for public exposure: rate limits, security headers, forged-header rejection
 - [x] Self-hosted deployment over Cloudflare Tunnel, with a stable redirect link
+- [x] Cheap detection of newly-published Moodle material, surfaced in the interface
 - [ ] Named tunnel on an owned domain (no more address churn)
 - [ ] Pagination — stop hydrating every result to display twenty
 - [ ] OR queries, exact phrases, stemming
