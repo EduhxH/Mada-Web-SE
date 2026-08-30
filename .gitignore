@@ -41,3 +41,6 @@ data/uso.sqlite3
 # Registo de material novo do Moodle: estado local, nao versionado
 data/novidades.json
 data/verificacao.log
+
+# Instantaneos de medicao, regenerados com --guardar
+avaliacao/base*.json

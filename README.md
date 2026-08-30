@@ -54,7 +54,7 @@ It crawls the school website (respecting `robots.txt`, rate limits and depth), i
 
 Queries are answered with graceful relaxation — all terms, then a quorum, then any — ranked by TF-IDF with a title boost, expanded across singular/plural variants, and grouped into sections so results stay legible.
 
-**Current corpus: 1,761 documents, 18,125 unique terms** — 1,010 pages and PDFs crawled from the school site plus 751 documents synced from Moodle across 10 course subjects. Queries run in single-digit milliseconds.
+**Current corpus: 1,761 documents, 18,095 unique terms** — 1,010 pages and PDFs crawled from the school site plus 751 documents synced from Moodle across 10 course subjects. Queries run in single-digit milliseconds.
 
 The engine is a **catalogue, not a repository**: results link back to where the document actually lives. Nothing is republished, and no personal data is ever indexed.
 
@@ -70,7 +70,7 @@ Zero search APIs. Every result is computed here.
 | 🏷️ **Discipline Metadata** | Folder name becomes the `disciplina` field, shown as a badge in results. | ✅ Done |
 | 📋 **Ingestion Report** | Per-discipline and per-format counts, plus every skipped file with its reason (unsupported format, no extractable text, build artifact, possible personal data). | ✅ Done |
 | 🔒 **Personal-data Guard** | Filenames matching grade patterns (`notas`, `pauta`, `classifica`) are excluded from the index and listed explicitly in the report. | ✅ Done |
-| 🔤 **Tokenizer** | camelCase splitting (`FichaRevisoes` → `ficha revisoes`), lowercasing, Unicode NFKD accent stripping, token extraction, minimum token length and an explicit stop-word list — applied identically at index time and query time. | ✅ Done |
+| 🔤 **Tokenizer** | camelCase splitting (`FichaRevisoes` → `ficha revisoes`, but never `3D` → `3`), lowercasing, Unicode NFKD accent stripping, ordinal reduction (`10º` → `10`), digits kept whatever their length, and an explicit stop-word list — applied identically at index time and query time. | ✅ Done |
 | 📚 **Inverted Index** | `term → {doc_id: frequency}` built in a single O(T) pass with `collections.Counter`. | ✅ Done |
 | 🗄️ **SQLite Persistence** | Relational schema (`documents`, `terms`, `postings`) written transactionally; B-tree lookup on terms. | ✅ Done |
 | 🔎 **Boolean AND Search** | Posting-list intersection starting from the smallest list; never rescans documents. | ✅ Done |
@@ -88,10 +88,10 @@ Zero search APIs. Every result is computed here.
 | 📰 **What's New** | Detected material surfaces in the interface as a discreet line on the search page and a dated listing at `/novidades`, each entry linking to a search for it. | ✅ Done |
 | 🔄 **One-command Update** | `python main.py atualizar` crawls the site, reindexes everything and reports what changed — new, modified, removed, unchanged. The crawler writes to a staging folder and swaps atomically, so an interrupted run never damages a working corpus. | ✅ Done |
 | 🔑 **Stable Document Ids** | Ids are derived from the document's origin, not from read order, so reindexing after new material arrives never shifts them — the recorded click history keeps pointing at the right documents. | ✅ Done |
-| 🔁 **Morphological Expansion** | Singular/plural variants are added to the query — rules propose, the index vocabulary decides, so nothing is ever invented. Fixes 25% of the vocabulary being duplicated by number, without the information loss of stemming. | ✅ Done |
-| ⬆️ **Title Boost** | A hit in the title outweighs one in the body — the title says what a document *is*, the body only what it mentions. Applied after ranking, at no extra I/O cost. | ✅ Done |
+| 🔁 **Morphological Expansion** | Singular/plural variants and both sides of the 1990 orthographic reform (`adotados` ↔ `adoptados`) are added to the query — rules propose, the index vocabulary decides, so nothing is ever invented. 94 spelling pairs coexist in this corpus, school documents predating the reform and students not. A length floor keeps `apto` from collapsing into `ato`. | ✅ Done |
+| ⬆️ **Title Boost** | A hit in the title outweighs one in the body — the title says what a document *is*, the body only what it mentions. The weight was not chosen but swept from 0 to 10 against the evaluation set: the gain grows to 3.0 and plateaus, with no query regressing. Applied after ranking, at no extra I/O cost. | ✅ Done |
 | 📊 **TF-IDF Ranking** | TF = freq / doc length, IDF = log(N / df); rare terms weigh more, long documents don't win by length alone. | ✅ Done |
-| 🧪 **Oracle-verified Tests** | 339 pytest tests; the integration suite proves the index returns exactly what the naive search returns. | ✅ Done |
+| 🧪 **Oracle-verified Tests** | 402 pytest tests; the integration suite proves the index returns exactly what the naive search returns. | ✅ Done |
 | ⏱️ **Naive vs. Indexed Benchmark** | `scripts/comparar_busca.py` times both paths on the real corpus and checks they agree. | ✅ Done |
 | 💻 **CLI** | `indexar` / `buscar` subcommands plus an interactive prompt with context snippets. | ✅ Done |
 | 🖥️ **Local Web UI** | Plain, dependency-free search page (standard-library HTTP server, term highlighting): `python main.py web`. | ✅ Done |
@@ -104,6 +104,12 @@ Zero search APIs. Every result is computed here.
 | 🧭 **Discipline Landing** | Picking a subject with no query shows its characteristic topics (discipline-level TF-IDF, with a coverage ceiling that filters out boilerplate), what the class searched for, and its most-opened documents. | ✅ Done |
 | 🧠 **Portuguese POS Tagging** | Suffix-rule tagger that demotes infinitives, gerunds, participles, adverbs and conjugated forms from topic candidates, guarded by exception lists so nouns like *professor*, *calor* or *velocidade* survive. Demotion only affects topic suggestions — never the index or search. | ✅ Done |
 | 🗂️ **Result Sections** | Results are grouped into Horários / Fichas e materiais / Regulamentos / Páginas do site, ordered so the section holding the best hit leads. Grouping is skipped when everything falls in one section; each section links to its full listing. | ✅ Done |
+| 📏 **Measured Search Quality** | An evaluation set of 33 real queries — taken from the usage log, not invented — with ground truth pinned to a fragment of each document's origin, since origins survive reindexing and the old click history did not. `scripts/avaliar_busca.py` reports recall@1/3/10, MRR, and a per-query diff against a saved baseline, because an average that rises can hide queries that fell. Every ranking change in this project is swept and measured against it before it stays. | ✅ Done |
+| 🧠 **Query Understanding** | The discipline written in the question becomes a filter ("sebenta de física" → Física-Química), words like "última" become an ordering, and both are removed from the search terms. Eleven disciplines, matched longest-alias-first so "educação física" is never read as "física". | ✅ Done |
+| 🗣️ **School Vocabulary** | Students write "ficha"; the file is called "Guião de Trabalho". A hand-written synonym map bridges the gap, capped by document frequency so a rare term never expands into one covering half the collection. Only active when a discipline filter is: measured, always-on synonyms pushed "sebenta" from 1st to 8th. | ✅ Done |
+| 📅 **Publication Dates** | The connector reads `Last-Modified` on every download, so "última ficha de português" can order by when material was actually published. 751 documents carry a real date; those without one sort last rather than being guessed at. | ✅ Done |
+| 📑 **One Result per File** | Page-level indexing points to the exact page but made a terrible list: 54% of top-10 slots were repeated pages of one file, and for "regulamento interno" a single PDF filled all ten. Files now appear once, by their best page, with "and 60 more pages in this document" underneath. Identical content published in several places collapses too. | ✅ Done |
+| 🔢 **Numbers Kept** | The minimum token length existed for stray letters; a stray digit means something here, where everything is organised by module. "módulo 3" used to lose the 3. Ordinals reduce to their number so "10 ano" matches "10º ano". | ✅ Done |
 | 🐳 **Docker** | Containerized indexing and search. | 🔨 Planned |
 
 ---
@@ -120,6 +126,7 @@ Zero search APIs. Every result is computed here.
 | pytest | Automated unit and integration tests |
 | dataclasses / Counter / regex / unicodedata | Standard-library building blocks — no framework |
 | requests + BeautifulSoup | HTTP fetching, HTML parsing and the Moodle session |
+| numpy + fastembed | Embeddings — optional, off by default (see Known Limitations) |
 | hmac / hashlib (stdlib) | Hashed invite codes, signed sessions, stable document ids |
 | Cloudflare Tunnel | Public access with no inbound port open on the network |
 | GitHub Pages | Stable redirect page in front of the tunnel's changing address |
@@ -292,7 +299,34 @@ Pass `--sem-publicar` to open the tunnel without touching GitHub. Note that
 Cloudflare offers **no uptime guarantee** on accountless tunnels; a named
 tunnel bound to your own domain is the durable option.
 
-**8. Keep the corpus fresh automatically**
+**8. Measure the search before changing it**
+
+```bash
+.venv\Scripts\python scriptsvaliar_busca.py --detalhe
+```
+
+33 queries taken from the real usage log, each with a known-correct document.
+Ground truth is a fragment of the document's *origin*, not its id: origins
+survive reindexing, and the click history recorded before ids became stable
+did not.
+
+Save a baseline before a change and compare after:
+
+```bash
+.venv\Scripts\python scriptsvaliar_busca.py --guardar antes.json
+```
+
+```bash
+.venv\Scripts\python scriptsvaliar_busca.py --comparar antes.json
+```
+
+The comparison lists what moved **per query**, not just the average — an
+average that rises can hide queries that fell. Three plausible ideas were
+rejected this way: semantic search, always-on synonyms, and indexing the
+Moodle folder names. Two were kept after sweeping their parameter rather than
+picking one: the title weight and the discipline partition.
+
+**9. Keep the corpus fresh automatically**
 
 Moodle offers no webhook to a student account, so freshness means asking —
 the trick is asking cheaply. `--verificar` fetches one page per course and
@@ -322,7 +356,7 @@ schtasks /create /tn "Madalena - verificar Moodle" /tr "%CD%\scripts\verificar_d
 Anything found appears in the web interface, on the search page and at
 `/novidades`.
 
-**9. Tests, benchmark and usage stats**
+**10. Tests, benchmark and usage stats**
 
 ```bash
 .venv\Scripts\python -m pytest
@@ -358,7 +392,12 @@ Mada-Web-SE/
 │   │   ├── query.py             # Relaxation, discipline filter, auto-correction
 │   │   ├── ranker.py            # TF-IDF + coordination factor
 │   │   ├── spelling.py          # Levenshtein distance and suggestions
-│   │   ├── morfologia.py        # Singular/plural expansion, vocabulary-checked
+│   │   ├── morfologia.py        # Number and 1990-spelling variants, vocabulary-checked
+│   ├── intencao.py          # Discipline and recency read from the question
+│   ├── sinonimos.py         # School jargon: ficha ≈ guião ≈ exercício
+│   ├── agrupamento.py       # One result per file, not per page
+│   ├── hibrida.py           # Composes the pieces into one search
+│   ├── semantica.py         # Embeddings (built, measured, left off - see below)
 │   │   ├── seccoes.py           # Result grouping into readable sections
 │   │   ├── temas.py             # Discipline-level TF-IDF topic extraction
 │   │   ├── sugestoes.py         # Query suggestions (history + popular + vocab)
@@ -376,13 +415,18 @@ Mada-Web-SE/
 │       ├── document.py          # Immutable Documento record
 │       ├── novidades.py         # Record of newly-published material
 │       └── classificacao.py     # Shared patterns (breaks an import cycle)
+├── avaliacao/
+│   ├── consultas.json           # 33 real queries with known answers
+│   └── referencia.json          # current measurement, for --comparar
 ├── data/                        # Corpus, index, secrets — all git-ignored
 ├── scripts/
 │   ├── comparar_busca.py        # Naive vs. indexed benchmark
+│   ├── avaliar_busca.py         # Search quality against the evaluation set
+│   ├── indexar_semantica.py     # Builds the embedding index
 │   ├── publicar_tunel.py        # Tunnel + stable redirect page
 │   ├── verificar_diario.cmd     # Scheduled Moodle check + reindex
 │   └── pagina_publica.html      # Redirect page template
-├── tests/{unit,integration}/    # 339 tests
+├── tests/{unit,integration}/    # 402 tests
 ├── main.py                      # CLI entry point
 └── .env.example                 # Signing key and Moodle credentials
 ```
@@ -424,7 +468,12 @@ Mada-Web-SE/
 - [x] Self-hosted deployment over Cloudflare Tunnel, with a stable redirect link
 - [x] Cheap detection of newly-published Moodle material, surfaced in the interface
 - [ ] Named tunnel on an owned domain (no more address churn)
+- [x] Evaluation set of real queries, with per-query regression diffs
+- [x] Query understanding: discipline, recency and school jargon read from the question
+- [x] Publication dates from the Moodle connector
+- [x] One result per file instead of one per page
 - [ ] Pagination — stop hydrating every result to display twenty
+- [ ] Capture the Moodle section name to tell same-named files apart
 - [ ] OR queries, exact phrases, stemming
 - [ ] Docker image and compose setup
 - [ ] Reimplement selected modules in TypeScript and Go for comparison
@@ -442,8 +491,9 @@ Mada-Web-SE/
   token, not more student passwords.
 - **Scanned documents are invisible.** A photographed worksheet has no text
   layer; OCR is out of scope for now.
-- **All results are hydrated before paging.** A 167-result query loads every
-  document's text to display 20. Harmless at this size; pagination is the fix.
+- **All results are hydrated before paging.** A 265-result query loads 588,000
+  characters to display 20. Measured at 20 ms with a warm cache, so it is not
+  today a latency problem — but it is wasted work, and pagination is the fix.
 - **HTTPS only through the tunnel.** Traffic is encrypted end to end when it
   arrives via Cloudflare, and the session cookie is marked `Secure` on exactly
   those requests. Served directly over a local network with `--host 0.0.0.0`
@@ -452,10 +502,22 @@ Mada-Web-SE/
   every restart and carry no uptime guarantee. The redirect page hides the
   churn from participants, but a named tunnel on an owned domain is what
   actually makes the address durable.
-- **No semantic matching.** Paraphrases ("how do I justify an absence") do not
-  reach documents phrased differently. Morphological expansion covers number,
-  spelling suggestions cover typos, but synonyms and rewording are out of reach
-  without embeddings.
+- **No semantic matching — and embeddings were tried.** A full semantic index
+  was built (10,132 fragments, a multilingual model, entirely local) and
+  measured against the evaluation set. It scored *worse* than lexical search at
+  every similarity threshold (MRR 0.80 vs 0.81) and did not solve the query it
+  was built for: for "quando começam as aulas" the calendar does not surface,
+  because a 300-character fragment of a 40-entry date table averages out to
+  "calendar" rather than "start of classes". The code and the index are kept;
+  the hybrid path is off. Two things would be needed to revisit it — line-level
+  fragmentation and a model trained for asymmetric retrieval — and neither is
+  cheap on a 2012 CPU without AVX2. The one case where it would genuinely win
+  is cross-language: "regras da aula de inglês" cannot reach a file called
+  "Rules For English Class" by any lexical rule.
+- **Files with the same name are hard to tell apart.** Four different
+  `FichaRevisoes.pdf` exist, one per module, with different content. The
+  publication date now distinguishes most of them; two published the same day
+  still look identical. Capturing the Moodle *section* name would fix it.
 - **Topic extraction has honest residue.** Imperatives (`crie`), abbreviations
   (`trab`, `ctrl`), PDF extraction artefacts (`passagemde`) and typos in the
   source documents still surface occasionally.

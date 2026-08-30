@@ -17,7 +17,8 @@ import json
 
 from app.search import sugestoes
 from app.search import seccoes as mod_seccoes
-from app.search.query import MODO_OU, MODO_QUORUM, buscar_detalhado
+from app.search import hibrida
+from app.search.query import MODO_OU, MODO_QUORUM
 from app.search.snippet import gerar_trecho
 
 CAMINHO_BANCO = Path("data") / "indice.sqlite3"
@@ -70,6 +71,8 @@ ul.dsc { list-style: none; padding: 0; margin: 0; font-size: 14px; line-height: 
 ul.dsc a { color: #24418c; text-decoration: none; }
 ul.dsc a:hover { text-decoration: underline; }
 .vezes { color: #aaa; font-size: 11px; }
+.paginas { color: #777; font-size: 12px; margin: 4px 0 0; font-style: italic; }
+.titulo .quando { color: #999; font-size: 11px; border: 1px solid #e5e5e5; padding: 1px 5px; margin-right: 6px; }
 .novo { font-size: 13px; color: #555; background: #f5f2e8; border: 1px solid #e0d8c0; padding: 6px 10px; margin: 0 0 16px; }
 .novo a { color: #24418c; }
 ul.novo-lista { list-style: none; padding: 0; margin: 0; }
@@ -405,19 +408,64 @@ def _renderizar(consulta: str, disciplina: str, resultado, seccao: str = "") -> 
         f'<p class="meta">{len(resultado.documentos)} resultado(s){aviso}</p>',
         sugestao,
     ]
+    paginas = {
+        grupo.documento.id: grupo.paginas for grupo in getattr(resultado, "grupos", [])
+    }
     blocos.append(
-        _corpo_resultados(resultado.documentos, consulta, disciplina, termos, seccao)
+        _corpo_resultados(
+            resultado.documentos, consulta, disciplina, termos, seccao, paginas
+        )
     )
     return "\n".join(bloco for bloco in blocos if bloco)
 
 
-def _um_resultado(doc, pontuacao, consulta, posicao, termos):
+_MESES = (
+    "jan", "fev", "mar", "abr", "mai", "jun",
+    "jul", "ago", "set", "out", "nov", "dez",
+)
+
+
+def _data_legivel(iso: str) -> str:
+    """"2026-07-24" -> "jul 2026".
+
+    O dia exato nao interessa; o mes e o ano dizem se o material e deste
+    periodo ou do ano passado. Serve tambem para distinguir ficheiros com o
+    mesmo nome: ha quatro "FichaRevisoes.pdf", um por modulo, e ate agora
+    apareciam na lista como quatro linhas iguais.
+    """
+    partes = (iso or "").split("-")
+    if len(partes) < 2 or not partes[0].isdigit() or not partes[1].isdigit():
+        return ""
+    mes = int(partes[1])
+    if not 1 <= mes <= 12:
+        return ""
+    return f"{_MESES[mes - 1]} {partes[0]}"
+
+
+def _outras_paginas(quantas: int) -> str:
+    """Diz que o mesmo ficheiro tem mais paginas com a consulta.
+
+    Antes, cada pagina era um resultado: "regulamento interno" enchia os dez
+    lugares com o mesmo PDF. Agora o ficheiro aparece uma vez, pela melhor
+    pagina, e o resto conta-se aqui.
+    """
+    if quantas <= 1:
+        return ""
+    outras = quantas - 1
+    palavra = "pagina" if outras == 1 else "paginas"
+    return f'<p class="paginas">e mais {outras} {palavra} neste documento</p>'
+
+
+def _um_resultado(doc, pontuacao, consulta, posicao, termos, paginas=1):
     trecho = _destacar(gerar_trecho(doc.texto, termos), termos)
     etiqueta = (
         f'<span class="disciplina">{html.escape(doc.disciplina)}</span>'
         if doc.disciplina
         else ""
     )
+    quando = _data_legivel(getattr(doc, "data", ""))
+    if quando:
+        etiqueta += f'<span class="quando">{quando}</span>'
     return (
         f'<div class="resultado" data-id="{doc.id}">'
         f'<p class="titulo">{etiqueta}'
@@ -426,6 +474,7 @@ def _um_resultado(doc, pontuacao, consulta, posicao, termos):
         f"{html.escape(doc.titulo)}</a>"
         f'<span class="pontuacao">{pontuacao:.4f}</span></p>'
         f'<p class="trecho">{trecho}</p>'
+        f"{_outras_paginas(paginas)}"
         '<button type="button" class="prever">prever</button>'
         '<div class="pv-inline"></div>'
         "</div>"
@@ -441,7 +490,11 @@ def _url(consulta, disciplina, seccao=""):
     return "/?" + urlencode(parametros)
 
 
-def _corpo_resultados(documentos, consulta, disciplina, termos, seccao):
+def _corpo_resultados(
+    documentos, consulta, disciplina, termos, seccao, paginas=None
+):
+    # {id do documento: quantas paginas do mesmo ficheiro casaram}
+    paginas = paginas or {}
     if seccao:
         escolhidos = mod_seccoes.filtrar(documentos, seccao)
         partes = [
@@ -451,7 +504,10 @@ def _corpo_resultados(documentos, consulta, disciplina, termos, seccao):
             f'<span class="conta">{len(escolhidos)}</span></h2>',
         ]
         partes += [
-            _um_resultado(doc, pontuacao, consulta, posicao, termos)
+            _um_resultado(
+                doc, pontuacao, consulta, posicao, termos,
+                paginas.get(doc.id, 1),
+            )
             for posicao, (doc, pontuacao) in enumerate(
                 escolhidos[:LIMITE_RESULTADOS], start=1
             )
@@ -462,7 +518,10 @@ def _corpo_resultados(documentos, consulta, disciplina, termos, seccao):
 
     if len(grupos) <= 1:
         partes = [
-            _um_resultado(doc, pontuacao, consulta, posicao, termos)
+            _um_resultado(
+                doc, pontuacao, consulta, posicao, termos,
+                paginas.get(doc.id, 1),
+            )
             for posicao, (doc, pontuacao) in enumerate(
                 documentos[:LIMITE_RESULTADOS], start=1
             )
@@ -489,7 +548,12 @@ def _corpo_resultados(documentos, consulta, disciplina, termos, seccao):
         )
         for doc, pontuacao in itens[:POR_SECCAO]:
             posicao += 1
-            partes.append(_um_resultado(doc, pontuacao, consulta, posicao, termos))
+            partes.append(
+                _um_resultado(
+                    doc, pontuacao, consulta, posicao, termos,
+                    paginas.get(doc.id, 1),
+                )
+            )
     return "\n".join(partes)
 
 
@@ -517,8 +581,9 @@ def _montar_pagina(
                 corpo=corpo,
             )
         if consulta:
-            resultado = buscar_detalhado(
-                conexao, consulta, disciplina or None, permitir_ou=not exato
+            resultado = hibrida.buscar(
+                conexao, consulta, disciplina=disciplina or None,
+                permitir_ou=not exato,
             )
             with uso.abrir() as registo:
                 uso.registar(

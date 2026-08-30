@@ -11,6 +11,18 @@ tal como aparece nos documentos, e e a pergunta que fica mais generosa.
 COMPRIMENTO_MINIMO = 3
 MAXIMO_VARIANTES = 3
 
+# Consoantes que o acordo ortografico de 1990 deixou cair quando eram mudas:
+# "objectivo" passou a "objetivo", "accao" a "acao", "percepcao" a "percecao".
+# O corpus da escola tem as duas grafias - documentos antigos com a velha,
+# recentes com a nova - e os alunos escrevem a que aprenderam. Sem isto,
+# procurar "manuais adotados" nao encontra "MANUAIS ADOPTADOS".
+_MUDAS = ("c", "p")
+_DEPOIS_DA_MUDA = ("t", "c", "ç")
+
+# Piso alto de proposito. Em palavras curtas a regra colide com palavras
+# distintas: "apto" -> "ato" sao coisas diferentes, e o piso resolve isso.
+COMPRIMENTO_GRAFIA = 6
+
 
 def _plurais(termo: str) -> list[str]:
     if termo.endswith("ao"):
@@ -43,13 +55,36 @@ def _singulares(termo: str) -> list[str]:
     return candidatos
 
 
+def _grafias(termo: str) -> list[str]:
+    """Formas do termo na outra grafia, nas duas direcoes.
+
+    Nao se sabe qual das grafias o utilizador escreveu, por isso propoem-se
+    ambas: tirar a consoante muda e po-la de volta. Como sempre neste modulo,
+    quem decide o que e real e o vocabulario.
+    """
+    if len(termo) < COMPRIMENTO_GRAFIA:
+        return []
+
+    candidatos = []
+    for posicao, letra in enumerate(termo):
+        if letra not in _DEPOIS_DA_MUDA:
+            continue
+        # grafia nova -> velha: "atividade" -> "actividade"
+        for muda in _MUDAS:
+            candidatos.append(termo[:posicao] + muda + termo[posicao:])
+        # grafia velha -> nova: "actividade" -> "atividade"
+        if posicao and termo[posicao - 1] in _MUDAS:
+            candidatos.append(termo[: posicao - 1] + termo[posicao:])
+    return candidatos
+
+
 def variantes(termo: str, vocabulario: set[str]) -> set[str]:
     """Formas do mesmo termo que existem no indice, incluindo a original."""
     encontradas = {termo}
     if len(termo) < COMPRIMENTO_MINIMO:
         return encontradas
 
-    for candidato in _plurais(termo) + _singulares(termo):
+    for candidato in _plurais(termo) + _singulares(termo) + _grafias(termo):
         if len(candidato) < COMPRIMENTO_MINIMO or candidato == termo:
             continue
         if candidato in vocabulario:

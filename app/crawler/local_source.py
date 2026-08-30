@@ -92,14 +92,20 @@ def carregar(caminho: str | Path) -> tuple[list[Documento], Relatorio]:
         if isinstance(entrada, dict):
             origem_do_ficheiro = entrada.get("url") or str(arquivo)
             titulo_do_manifesto = entrada.get("titulo") or ""
+            data_do_manifesto = entrada.get("data") or ""
+            contexto_do_manifesto = entrada.get("contexto") or ""
         else:
             origem_do_ficheiro = entrada or str(arquivo)
             titulo_do_manifesto = ""
+            data_do_manifesto = ""
+            contexto_do_manifesto = ""
         _processar(
             nome=arquivo.name,
             dados=arquivo.read_bytes(),
             origem=origem_do_ficheiro,
             titulo_dado=titulo_do_manifesto,
+            data=data_do_manifesto,
+            contexto=contexto_do_manifesto,
             disciplina=_disciplina(raiz, arquivo),
             documentos=documentos,
             relatorio=relatorio,
@@ -176,6 +182,8 @@ def _processar(
     documentos: list[Documento],
     relatorio: Relatorio,
     titulo_dado: str = "",
+    data: str = "",
+    contexto: str = "",
     vistos: set[int] | None = None,
     dentro_de_zip: bool = False,
 ) -> None:
@@ -194,7 +202,10 @@ def _processar(
         if dentro_de_zip:
             relatorio.ignorar(origem, MOTIVO_ZIP_ANINHADO)
             return
-        _processar_zip(dados, origem, disciplina, documentos, relatorio, vistos)
+        _processar_zip(
+            dados, origem, disciplina, documentos, relatorio, vistos, data,
+            contexto,
+        )
         return
 
     if extensao not in EXTENSOES_SUPORTADAS:
@@ -242,6 +253,8 @@ def _processar(
                 texto=conteudo,
                 origem=origem_completa,
                 disciplina=disciplina,
+                data=data,
+                contexto=contexto,
             )
         )
         guardados += 1
@@ -258,6 +271,8 @@ def _processar_zip(
     documentos: list[Documento],
     relatorio: Relatorio,
     vistos: set[int],
+    data: str = "",
+    contexto: str = "",
 ) -> None:
     try:
         arquivo_zip = zipfile.ZipFile(io.BytesIO(dados))
@@ -284,6 +299,10 @@ def _processar_zip(
                 dados=conteudo,
                 origem=rotulo,
                 disciplina=disciplina,
+                # Herdam a data do pacote: e a unica que conhecemos, e um
+                # ficheiro dentro de um ZIP foi publicado com ele.
+                data=data,
+                contexto=contexto,
                 documentos=documentos,
                 relatorio=relatorio,
                 vistos=vistos,

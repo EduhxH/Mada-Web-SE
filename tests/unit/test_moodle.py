@@ -440,3 +440,42 @@ def test_verificar_ignora_modulo_ja_examinado(tmp_path, monkeypatch):
     novos, vistos = moodle.verificar(tmp_path, intervalo=0)
     assert novos == []
     assert vistos == 1
+
+
+def test_filtro_de_disciplina_ignora_acentos():
+    """"--disciplina portugues" devolvia zero por causa do cedilha."""
+    todas = [(1, "PSI9-Português"), (2, "PSI9-Matemática")]
+    assert moodle._filtrar_disciplinas(todas, ["portugues"]) == [(1, "PSI9-Português")]
+    assert moodle._filtrar_disciplinas(todas, ["matematica"]) == [(2, "PSI9-Matemática")]
+
+
+def test_filtro_aceita_abreviatura():
+    todas = [(1, "PSI9-Português")]
+    assert moodle._filtrar_disciplinas(todas, ["portug"]) == todas
+
+
+def test_filtro_nao_casa_pedaco_no_meio_de_palavra():
+    """"tic" estava a apanhar "matematica" e a sincronizar a disciplina errada."""
+    todas = [(1, "PSI9-Matemática"), (2, "TIC")]
+    assert moodle._filtrar_disciplinas(todas, ["tic"]) == [(2, "TIC")]
+
+
+def test_data_da_resposta_le_o_last_modified():
+    class Resposta:
+        headers = {"Last-Modified": "Mon, 20 Oct 2025 17:21:05 GMT"}
+
+    assert moodle.data_da_resposta(Resposta()) == "2025-10-20"
+
+
+def test_sem_last_modified_nao_inventa_data():
+    class Resposta:
+        headers = {}
+
+    assert moodle.data_da_resposta(Resposta()) == ""
+
+
+def test_data_invalida_nao_rebenta():
+    class Resposta:
+        headers = {"Last-Modified": "ontem a tarde"}
+
+    assert moodle.data_da_resposta(Resposta()) == ""

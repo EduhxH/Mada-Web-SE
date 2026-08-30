@@ -1,0 +1,193 @@
+{
+ "nota": "Conjunto de avaliacao da busca. As consultas vieram do registo de uso real (data/uso.sqlite3), nao foram inventadas. A verdade-terreno e um pedaco da ORIGEM do documento certo, e nao o seu id: as origens sobrevivem a reindexacoes, os ids do registo antigo nao sobreviveram. Consultas com nome de pessoa ficaram de fora por principio. Os casos com fonte 'disciplina' foram acrescentados em 2026-08-30 para medir a deteccao da disciplina escrita na propria pergunta, antes de essa deteccao existir. Os casos 'numero' foram acrescentados em 2026-08-30, antes de o tokenizer saber guardar digitos: a escola organiza tudo por modulo (M1, F5, P3) e por ano (10o, 12o). Em 'trabalho de ingles' o esperado e '8258', que apanha as duas pastas de Ingles: a disciplina so tem dois ficheiros e nenhum e um trabalho, mas qualquer um deles e melhor resposta do que 'Higiene e Seguranca no Trabalho', que e o que vinha antes.",
+ "criado": "2026-08-30",
+ "casos": [
+  {
+   "consulta": "calendario escolar",
+   "esperado": "Calendario-Escolar",
+   "fonte": "derivada"
+  },
+  {
+   "consulta": "interrupcao escolar",
+   "esperado": "Calendario-Escolar",
+   "fonte": "registo"
+  },
+  {
+   "consulta": "ferias de natal",
+   "esperado": "Calendario-Escolar",
+   "fonte": "derivada"
+  },
+  {
+   "consulta": "inicio das aulas",
+   "esperado": "Calendario-Escolar",
+   "fonte": "derivada"
+  },
+  {
+   "consulta": "quando comecam as aulas",
+   "esperado": "Calendario-Escolar",
+   "fonte": "parafrase"
+  },
+  {
+   "consulta": "regulamento interno",
+   "esperado": "REGULAMENTO-INTERNO",
+   "fonte": "registo"
+  },
+  {
+   "consulta": "regulamento",
+   "esperado": "REGULAMENTO-INTERNO",
+   "fonte": "registo"
+  },
+  {
+   "consulta": "criterios de avaliacao",
+   "esperado": "Criterios-Gerais-Avaliacao",
+   "fonte": "registo"
+  },
+  {
+   "consulta": "criterios avaliacao tic",
+   "esperado": "Criterios-Avaliacao-TIC",
+   "fonte": "derivada"
+  },
+  {
+   "consulta": "arrays",
+   "esperado": "Manual_Arrays",
+   "fonte": "registo"
+  },
+  {
+   "consulta": "manual",
+   "esperado": "Manual_Arrays",
+   "fonte": "registo"
+  },
+  {
+   "consulta": "manuais adotados",
+   "esperado": "MANUAIS-ADOPTADOS",
+   "fonte": "derivada"
+  },
+  {
+   "consulta": "sebenta",
+   "esperado": "Sebenta",
+   "fonte": "registo"
+  },
+  {
+   "consulta": "exercicios",
+   "esperado": "exerc",
+   "fonte": "registo"
+  },
+  {
+   "consulta": "plano anual de atividades",
+   "esperado": "Plano-Anual-de-Atividades",
+   "fonte": "derivada"
+  },
+  {
+   "consulta": "projeto educativo",
+   "esperado": "Projeto-Educativo",
+   "fonte": "derivada"
+  },
+  {
+   "consulta": "ficha de portugues",
+   "esperado": "82369",
+   "fonte": "disciplina"
+  },
+  {
+   "consulta": "trabalho de portugues",
+   "esperado": "82369",
+   "fonte": "disciplina"
+  },
+  {
+   "consulta": "guiao de estatistica de matematica",
+   "esperado": "ESTATISTICA",
+   "fonte": "disciplina"
+  },
+  {
+   "consulta": "sebenta de fisica",
+   "esperado": "Sebenta modulo F5",
+   "fonte": "disciplina"
+  },
+  {
+   "consulta": "manual de blender de tic",
+   "esperado": "Manual_Blender",
+   "fonte": "disciplina"
+  },
+  {
+   "consulta": "dossier de arquitetura",
+   "esperado": "86285",
+   "fonte": "disciplina"
+  },
+  {
+   "consulta": "dossier modulo 3 de arquitetura",
+   "esperado": "86738",
+   "fonte": "numero"
+  },
+  {
+   "consulta": "dossier modulo 2 de arquitetura",
+   "esperado": "86285",
+   "fonte": "numero"
+  },
+  {
+   "consulta": "manuais adotados 10 ano",
+   "esperado": "MANUAIS-ADOPTADOS_10o",
+   "fonte": "numero"
+  },
+  {
+   "consulta": "manuais adotados 12 ano",
+   "esperado": "MANUAIS-ADOPTADOS_12o",
+   "fonte": "numero"
+  },
+  {
+   "consulta": "sebenta modulo f5",
+   "esperado": "Sebenta modulo F5",
+   "fonte": "numero"
+  },
+  {
+   "consulta": "modulo 2 de portugues",
+   "esperado": "82374",
+   "fonte": "numero"
+  },
+  {
+   "consulta": "regras da aula de ingles",
+   "esperado": "82581",
+   "fonte": "disciplina"
+  },
+  {
+   "consulta": "trabalho de ingles",
+   "esperado": "8258",
+   "fonte": "disciplina"
+  },
+  {
+   "consulta": "guioes de trabalho de fisica",
+   "esperado": "86231",
+   "fonte": "disciplina"
+  },
+  {
+   "consulta": "sistema de ficheiros de sistemas operativos",
+   "esperado": "82199",
+   "fonte": "disciplina"
+  },
+  {
+   "consulta": "planificacao de ingles",
+   "esperado": "82585",
+   "fonte": "disciplina"
+  }
+ ],
+ "lacunas": [
+  {
+   "consulta": "horario da turma psi9",
+   "vezes": 18,
+   "motivo": "nao existe nenhum horario no corpus"
+  },
+  {
+   "consulta": "horarios",
+   "vezes": 7,
+   "motivo": "nao existe nenhum horario no corpus"
+  },
+  {
+   "consulta": "horarios autocarros",
+   "vezes": 4,
+   "motivo": "nao existe nenhum horario no corpus"
+  },
+  {
+   "consulta": "tpc",
+   "vezes": 6,
+   "motivo": "nenhum documento usa a sigla"
+  }
+ ]
+}

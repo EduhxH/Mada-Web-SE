@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from app.indexing import storage
 from app.indexing.tokenizer import tokenizar
 from app.models.document import Documento
-from app.search import morfologia
+from app.search import morfologia, sinonimos
 from app.search.ranker import pontuar
 from app.search.spelling import distancia_edicao, sugerir
 
@@ -21,8 +21,17 @@ FRACAO_QUORUM = 0.6
 DISTANCIA_AUTOMATICA = 1
 DOCUMENTOS_MINIMOS_CORRECAO = 3
 # Um acerto no titulo vale mais que no corpo: o titulo diz o que o
-# documento E, o corpo so diz o que ele menciona.
-PESO_TITULO = 0.6
+# documento E, o corpo so diz o que ele menciona. Um documento intitulado
+# "Calendario Escolar" e o calendario, mesmo que nunca repita a expressao;
+# o TF-IDF sozinho preferia-lhe um regulamento que a menciona em prosa.
+#
+# 0.6 era demasiado timido. Varrido de 0 a 10 contra avaliacao/consultas.json:
+# o ganho cresce ate 3.0 e ai estabiliza (top-1 de 8/16 para 11/16, MRR de
+# 0.58 para 0.73), sem nenhuma consulta a piorar. Acima de 3.0 nada muda.
+# Multiplicativo e nao aditivo por ser invariante a escala: as pontuacoes
+# base variam duas ordens de grandeza entre consultas, e uma constante
+# somada esmagaria as diferencas nas mais baixas.
+PESO_TITULO = 3.0
 
 
 @dataclass
@@ -33,6 +42,13 @@ class ResultadoBusca:
     correcao: dict[str, str] = field(default_factory=dict)
     termos_exigidos: int = 0
     termos_totais: int = 0
+    # Disciplina lida da propria pergunta, para a interface poder mostrar o
+    # filtro que foi aplicado sozinho e oferecer maneira de o desligar.
+    disciplina_detetada: str = ""
+    ordenado_por_recencia: bool = False
+    # Paginas do mesmo ficheiro juntas: `documentos` traz a melhor de cada
+    # uma, `grupos` guarda as restantes para a interface as poder oferecer.
+    grupos: list = field(default_factory=list)
 
     def consulta_corrigida(self, consulta: str) -> str:
         trocas = {**self.sugestoes, **self.correcao}
@@ -49,6 +65,16 @@ class ResultadoBusca:
 
 
 _cache_vocabulario: dict[int, set[str]] = {}
+_cache_frequencias: dict[int, dict[str, int]] = {}
+
+
+def _frequencias(conexao) -> dict[str, int]:
+    """{termo: em quantos documentos aparece} - o teto dos sinonimos usa isto."""
+    total = storage.contar_documentos(conexao)
+    if total not in _cache_frequencias:
+        _cache_frequencias.clear()
+        _cache_frequencias[total] = dict(storage.listar_vocabulario(conexao))
+    return _cache_frequencias[total]
 
 
 def _vocabulario(conexao) -> set[str]:
@@ -63,6 +89,7 @@ def _vocabulario(conexao) -> set[str]:
 
 def limpar_cache() -> None:
     _cache_vocabulario.clear()
+    _cache_frequencias.clear()
 
 
 def _juntar(conexao, formas: set[str]) -> dict[int, int]:
@@ -74,12 +101,30 @@ def _juntar(conexao, formas: set[str]) -> dict[int, int]:
     return combinado
 
 
-def _carregar(conexao, termos: set[str], expandir: bool = True):
-    """Devolve (postings por termo, formas por termo)."""
+def _carregar(
+    conexao, termos: set[str], expandir: bool = True, calao: bool = False
+):
+    """Devolve (postings por termo, formas por termo).
+
+    `calao` liga os sinonimos da escola. So se liga quando ha filtro de
+    disciplina: medido, alargar "sebenta" para "manual" no corpus inteiro
+    empurrava a sebenta certa do 1o para o 8o lugar, enquanto dentro de uma
+    disciplina o mesmo alargamento traz o guiao que o aluno chamou de ficha.
+    """
     if not expandir:
         formas = {termo: {termo} for termo in termos}
     else:
         formas = morfologia.expandir(termos, _vocabulario(conexao))
+        # O calao da escola entra depois das formas: cada sinonimo traz
+        # tambem as suas proprias variantes de numero e de grafia.
+        if calao:
+            vocabulario = _vocabulario(conexao)
+            parentes = sinonimos.expandir(
+                termos, _frequencias(conexao), storage.contar_documentos(conexao)
+            )
+            for termo, irmaos in parentes.items():
+                for irmao in irmaos:
+                    formas[termo] |= morfologia.variantes(irmao, vocabulario)
     return {t: _juntar(conexao, f) for t, f in formas.items()}, formas
 
 
@@ -141,7 +186,9 @@ def buscar_detalhado(
     if not termos:
         return ResultadoBusca()
 
-    postings_por_termo, formas = _carregar(conexao, termos, expandir=permitir_ou)
+    postings_por_termo, formas = _carregar(
+        conexao, termos, expandir=permitir_ou, calao=bool(disciplina)
+    )
     sugestoes = _sugestoes(conexao, postings_por_termo)
 
     correcao: dict[str, str] = {}
@@ -149,18 +196,24 @@ def buscar_detalhado(
         correcao = _correcao_automatica(conexao, sugestoes)
         if correcao:
             termos = {correcao.get(t, t) for t in termos}
-            postings_por_termo, formas = _carregar(conexao, termos)
+            postings_por_termo, formas = _carregar(
+                conexao, termos, calao=bool(disciplina)
+            )
             sugestoes = {e: c for e, c in sugestoes.items() if e not in correcao}
 
     base = ResultadoBusca(
         sugestoes=sugestoes, correcao=correcao, termos_totais=len(termos)
     )
 
-    restricao = (
-        storage.carregar_ids_por_disciplina(conexao, disciplina)
-        if disciplina
-        else None
-    )
+    # Aceita uma disciplina ou varias: quem escolhe no menu quer so aquela,
+    # quem a escreveu na pergunta merece o beneficio da duvida e leva junto
+    # os documentos gerais da escola.
+    restricao = None
+    if disciplina:
+        nomes = [disciplina] if isinstance(disciplina, str) else list(disciplina)
+        restricao = set()
+        for nome in nomes:
+            restricao |= storage.carregar_ids_por_disciplina(conexao, nome)
 
     def restringir(candidatos: set[int]) -> set[int]:
         return candidatos & restricao if restricao is not None else candidatos

@@ -99,3 +99,29 @@ def test_e_administrativo_respeita_fronteiras():
     assert e_administrativo("ata da reuniao")
     assert not e_administrativo("tratamento de dados")
     assert not e_administrativo("sebenta modulo f5")
+
+
+def test_material_do_moodle_nao_e_pagina_do_site():
+    """O conector do Moodle passou a dar origens https, e antes disto os 751
+    documentos de disciplina caiam todos em "Paginas do site"."""
+    doc = _doc(
+        "Manual_Arrays.pdf - pagina 3",
+        origem="https://moodle.sefo.pt/mod/folder/view.php?id=82259#Manual_Arrays.pdf",
+        disciplina="Programacao",
+    )
+    assert seccoes.classificar(doc) == seccoes.MATERIAL
+
+
+def test_pagina_do_site_continua_a_ser_site():
+    doc = _doc("Cursos", origem="https://www.sefo.pt/oferta-formativa/", disciplina="Escola")
+    assert seccoes.classificar(doc) == seccoes.SITE
+
+
+def test_regulamento_no_moodle_continua_regulamento():
+    """O titulo manda: um regulamento e um regulamento venha de onde vier."""
+    doc = _doc(
+        "Regulamento Interno",
+        origem="https://moodle.sefo.pt/mod/resource/view.php?id=1",
+        disciplina="Turma PSI9",
+    )
+    assert seccoes.classificar(doc) == seccoes.REGULAMENTOS

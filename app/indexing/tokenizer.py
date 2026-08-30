@@ -22,9 +22,23 @@ STOP_WORDS = frozenset(
 _PADRAO_TOKEN = re.compile(r"[a-z0-9]+")
 # FichaRevisoes -> Ficha Revisoes; GestCampeonato -> Gest Campeonato.
 # Sem isto, nomes de ficheiro sem espacos viram um unico token inutil.
-_PADRAO_CAMEL = re.compile(r"([a-z0-9])([A-Z])")
+# So minuscula seguida de maiuscula e camelCase. Incluir digitos partia
+# "3D" em "3" e "D", e o "D" caia por ser curto: a modelacao 3D ficava
+# indexada como "3".
+_PADRAO_CAMEL = re.compile(r"([a-z])([A-Z])")
 
 COMPRIMENTO_MINIMO = 2
+
+# Ordinal reduzido ao numero: "10o ano" e "10 ano" sao a mesma coisa para
+# quem procura, mas eram termos diferentes no indice - por isso "manuais
+# adotados 10 ano" devolvia o 12o ano em primeiro lugar. O "º" ja chega aqui
+# como "o", cortesia da normalizacao NFKD.
+_ORDINAL = re.compile(r"^(\d+)[oa]$")
+
+
+def _reduzir_ordinal(token: str) -> str:
+    casado = _ORDINAL.match(token)
+    return casado.group(1) if casado else token
 
 
 def remover_acentos(texto: str) -> str:
@@ -35,9 +49,14 @@ def remover_acentos(texto: str) -> str:
 def tokenizar(texto: str, remover_stop_words: bool = True) -> list[str]:
     separado = _PADRAO_CAMEL.sub(lambda m: m.group(1) + " " + m.group(2), texto)
     normalizado = remover_acentos(separado.lower())
+    # O comprimento minimo existe para letras soltas, que nada dizem. Um
+    # digito solto diz: a escola organiza-se por modulos, e "modulo 3" perdia
+    # o 3 - a parte que distinguia a consulta.
     tokens = [
-        t for t in _PADRAO_TOKEN.findall(normalizado)
-        if len(t) >= COMPRIMENTO_MINIMO
+        reduzido
+        for t in _PADRAO_TOKEN.findall(normalizado)
+        for reduzido in (_reduzir_ordinal(t),)
+        if len(reduzido) >= COMPRIMENTO_MINIMO or reduzido.isdigit()
     ]
     if remover_stop_words:
         tokens = [t for t in tokens if t not in STOP_WORDS]

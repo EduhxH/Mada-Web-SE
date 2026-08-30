@@ -17,8 +17,10 @@ def test_frequencias_contadas(documentos):
 def test_tamanhos_dos_documentos(documentos):
     _, tamanhos = construir_indice(documentos)
     # "Doc 1" + "Python e uma linguagem de programacao"
-    # -> doc, python, linguagem, programacao ("1" e "de"/"uma" saem)
-    assert tamanhos[1] == 4
+    # -> doc, 1, python, linguagem, programacao ("de"/"uma" saem)
+    # O "1" conta desde que o tokenizer passou a guardar digitos: a escola
+    # organiza-se por modulos e "modulo 3" perdia o numero.
+    assert tamanhos[1] == 5
 
 
 def test_titulo_e_indexado(documentos):

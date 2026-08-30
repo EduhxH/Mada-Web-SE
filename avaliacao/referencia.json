@@ -1,0 +1,242 @@
+{
+ "resumo": {
+  "casos": 33,
+  "mrr": 0.8359,
+  "top1": 26,
+  "top3": 28,
+  "top10": 31
+ },
+ "linhas": [
+  {
+   "consulta": "calendario escolar",
+   "esperado": "Calendario-Escolar",
+   "posicao": 1,
+   "total": 11,
+   "modo": "e"
+  },
+  {
+   "consulta": "interrupcao escolar",
+   "esperado": "Calendario-Escolar",
+   "posicao": 1,
+   "total": 5,
+   "modo": "e"
+  },
+  {
+   "consulta": "ferias de natal",
+   "esperado": "Calendario-Escolar",
+   "posicao": 1,
+   "total": 2,
+   "modo": "e"
+  },
+  {
+   "consulta": "inicio das aulas",
+   "esperado": "Calendario-Escolar",
+   "posicao": 4,
+   "total": 22,
+   "modo": "e"
+  },
+  {
+   "consulta": "quando comecam as aulas",
+   "esperado": "Calendario-Escolar",
+   "posicao": 0,
+   "total": 9,
+   "modo": "quorum"
+  },
+  {
+   "consulta": "regulamento interno",
+   "esperado": "REGULAMENTO-INTERNO",
+   "posicao": 1,
+   "total": 13,
+   "modo": "e"
+  },
+  {
+   "consulta": "regulamento",
+   "esperado": "REGULAMENTO-INTERNO",
+   "posicao": 1,
+   "total": 21,
+   "modo": "e"
+  },
+  {
+   "consulta": "criterios de avaliacao",
+   "esperado": "Criterios-Gerais-Avaliacao",
+   "posicao": 3,
+   "total": 32,
+   "modo": "e"
+  },
+  {
+   "consulta": "criterios avaliacao tic",
+   "esperado": "Criterios-Avaliacao-TIC",
+   "posicao": 1,
+   "total": 25,
+   "modo": "e"
+  },
+  {
+   "consulta": "arrays",
+   "esperado": "Manual_Arrays",
+   "posicao": 1,
+   "total": 5,
+   "modo": "e"
+  },
+  {
+   "consulta": "manual",
+   "esperado": "Manual_Arrays",
+   "posicao": 4,
+   "total": 35,
+   "modo": "e"
+  },
+  {
+   "consulta": "manuais adotados",
+   "esperado": "MANUAIS-ADOPTADOS",
+   "posicao": 1,
+   "total": 7,
+   "modo": "e"
+  },
+  {
+   "consulta": "sebenta",
+   "esperado": "Sebenta",
+   "posicao": 1,
+   "total": 4,
+   "modo": "e"
+  },
+  {
+   "consulta": "exercicios",
+   "esperado": "exerc",
+   "posicao": 1,
+   "total": 57,
+   "modo": "e"
+  },
+  {
+   "consulta": "plano anual de atividades",
+   "esperado": "Plano-Anual-de-Atividades",
+   "posicao": 1,
+   "total": 12,
+   "modo": "e"
+  },
+  {
+   "consulta": "projeto educativo",
+   "esperado": "Projeto-Educativo",
+   "posicao": 1,
+   "total": 25,
+   "modo": "e"
+  },
+  {
+   "consulta": "ficha de portugues",
+   "esperado": "82369",
+   "posicao": 1,
+   "total": 27,
+   "modo": "e"
+  },
+  {
+   "consulta": "trabalho de portugues",
+   "esperado": "82369",
+   "posicao": 1,
+   "total": 122,
+   "modo": "e"
+  },
+  {
+   "consulta": "guiao de estatistica de matematica",
+   "esperado": "ESTATISTICA",
+   "posicao": 1,
+   "total": 2,
+   "modo": "e"
+  },
+  {
+   "consulta": "sebenta de fisica",
+   "esperado": "Sebenta modulo F5",
+   "posicao": 1,
+   "total": 21,
+   "modo": "e"
+  },
+  {
+   "consulta": "manual de blender de tic",
+   "esperado": "Manual_Blender",
+   "posicao": 1,
+   "total": 2,
+   "modo": "e"
+  },
+  {
+   "consulta": "dossier de arquitetura",
+   "esperado": "86285",
+   "posicao": 2,
+   "total": 8,
+   "modo": "e"
+  },
+  {
+   "consulta": "dossier modulo 3 de arquitetura",
+   "esperado": "86738",
+   "posicao": 1,
+   "total": 4,
+   "modo": "e"
+  },
+  {
+   "consulta": "dossier modulo 2 de arquitetura",
+   "esperado": "86285",
+   "posicao": 1,
+   "total": 6,
+   "modo": "e"
+  },
+  {
+   "consulta": "manuais adotados 10 ano",
+   "esperado": "MANUAIS-ADOPTADOS_10o",
+   "posicao": 1,
+   "total": 1,
+   "modo": "e"
+  },
+  {
+   "consulta": "manuais adotados 12 ano",
+   "esperado": "MANUAIS-ADOPTADOS_12o",
+   "posicao": 1,
+   "total": 1,
+   "modo": "e"
+  },
+  {
+   "consulta": "sebenta modulo f5",
+   "esperado": "Sebenta modulo F5",
+   "posicao": 1,
+   "total": 1,
+   "modo": "e"
+  },
+  {
+   "consulta": "modulo 2 de portugues",
+   "esperado": "82374",
+   "posicao": 4,
+   "total": 26,
+   "modo": "e"
+  },
+  {
+   "consulta": "regras da aula de ingles",
+   "esperado": "82581",
+   "posicao": 0,
+   "total": 7,
+   "modo": "e"
+  },
+  {
+   "consulta": "trabalho de ingles",
+   "esperado": "8258",
+   "posicao": 1,
+   "total": 117,
+   "modo": "e"
+  },
+  {
+   "consulta": "guioes de trabalho de fisica",
+   "esperado": "86231",
+   "posicao": 1,
+   "total": 23,
+   "modo": "e"
+  },
+  {
+   "consulta": "sistema de ficheiros de sistemas operativos",
+   "esperado": "82199",
+   "posicao": 1,
+   "total": 4,
+   "modo": "e"
+  },
+  {
+   "consulta": "planificacao de ingles",
+   "esperado": "82585",
+   "posicao": 1,
+   "total": 39,
+   "modo": "e"
+  }
+ ]
+}

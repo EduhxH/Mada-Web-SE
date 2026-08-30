@@ -11,9 +11,10 @@ navegar.
 
 import json
 import os
-from datetime import date
+from datetime import date, datetime, timezone
 import re
 import time
+import unicodedata
 from dataclasses import dataclass, field
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
@@ -209,6 +210,28 @@ def _limpar_titulo(texto: str) -> str:
     return limpo
 
 
+def data_da_resposta(resposta) -> str:
+    """Data de publicacao do ficheiro, em ISO, a partir do Last-Modified.
+
+    E a unica fonte de data que temos: o Moodle nao a mostra em lado nenhum
+    que possamos ler de forma fiavel. Ficheiros servidos dinamicamente - o
+    ZIP de uma pasta, por exemplo - nao trazem cabecalho nenhum e ficam sem
+    data, o que e melhor do que inventar uma.
+    """
+    bruto = resposta.headers.get("Last-Modified", "")
+    if not bruto:
+        return ""
+    for formato in ("%a, %d %b %Y %H:%M:%S %Z", "%a, %d %b %Y %H:%M:%S %z"):
+        try:
+            momento = datetime.strptime(bruto.strip(), formato)
+        except ValueError:
+            continue
+        if momento.tzinfo is None:
+            momento = momento.replace(tzinfo=timezone.utc)
+        return momento.date().isoformat()
+    return ""
+
+
 def _nome_da_resposta(resposta, alternativa: str) -> str:
     disposicao = resposta.headers.get("Content-Disposition", "")
     casado = re.search(r'filename="?([^";]+)"?', disposicao)
@@ -339,6 +362,8 @@ def _guardar_bytes(
     origens: dict,
     relatorio: RelatorioMoodle,
     disciplina: str,
+    data: str = "",
+    contexto: str = "",
 ) -> bool:
     extensao = Path(nome).suffix.lower()
     if extensao and extensao not in EXTENSOES_ACEITES:
@@ -349,7 +374,12 @@ def _guardar_bytes(
     # ficheiro tem de ficar sempre com o mesmo nome entre execucoes.
     guardado = nome_ficheiro(chave, extensao or ".bin")
     (destino / guardado).write_bytes(conteudo)
-    origens[guardado] = {"url": url_publico, "titulo": titulo or Path(nome).stem}
+    registo = {"url": url_publico, "titulo": titulo or Path(nome).stem}
+    if data:
+        registo["data"] = data
+    if contexto:
+        registo["contexto"] = contexto
+    origens[guardado] = registo
     _registar(relatorio, disciplina, len(conteudo))
     return True
 
@@ -363,6 +393,7 @@ def _descarregar_pasta(
     relatorio: RelatorioMoodle,
     disciplina: str,
     intervalo: float,
+    contexto: str = "",
 ) -> None:
     """Abre a pagina da pasta e descarrega cada ficheiro individualmente.
 
@@ -406,7 +437,7 @@ def _descarregar_pasta(
         _guardar_bytes(
             resposta.content, nome, f"folder-{identificador}-{nome}",
             f"{publico}#{nome}", titulo, destino, origens, relatorio,
-            disciplina,
+            disciplina, data_da_resposta(resposta), contexto,
         )
 
 
@@ -428,7 +459,7 @@ def descarregar_recurso(
     if modulo == "folder":
         _descarregar_pasta(
             sessao, url_base, identificador, destino, origens, relatorio,
-            disciplina, intervalo,
+            disciplina, intervalo, titulo,
         )
         return
 
@@ -466,6 +497,7 @@ def descarregar_recurso(
     _guardar_bytes(
         resposta.content, nome, f"{modulo}-{identificador}-{nome}",
         publico, titulo, destino, origens, relatorio, disciplina,
+        data_da_resposta(resposta),
     )
 
 
@@ -651,14 +683,38 @@ def verificar(
 
 
 def _filtrar_disciplinas(todas, pedidas: list[str] | None):
+    """Filtra por nome, ignorando acentos.
+
+    Sem isto, "--disciplina portugues" nao encontrava "Portugues" com cedilha
+    e devolvia zero ficheiros sem explicar porque.
+    """
     if not pedidas:
         return todas
-    procurados = [d.lower() for d in pedidas]
+    procurados = [_sem_acento(d) for d in pedidas if d.strip()]
     return [
         (identificador, nome)
         for identificador, nome in todas
-        if any(p in nome.lower() for p in procurados)
+        if any(_casa(p, nome) for p in procurados)
     ]
+
+
+def _casa(procurado: str, nome: str) -> bool:
+    """Casa por inicio de palavra, nao por pedaco solto.
+
+    "tic" dentro de "matematica" fazia --disciplina tic sincronizar tambem
+    Matematica. Exigir fronteira de palavra resolve, e continua a aceitar
+    abreviaturas: "portug" casa com "Portugues".
+    """
+    palavras = re.split(r"[^a-z0-9]+", _sem_acento(nome))
+    return any(palavra.startswith(procurado) for palavra in palavras if palavra)
+
+
+def _sem_acento(texto: str) -> str:
+    return (
+        unicodedata.normalize("NFKD", (texto or "").lower())
+        .encode("ascii", "ignore")
+        .decode()
+    )
 
 
 def sincronizar(

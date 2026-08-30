@@ -29,12 +29,28 @@ def test_texto_vazio():
     assert tokenizar("") == []
 
 
-def test_numeros_de_um_digito_sao_descartados():
-    assert tokenizar("Python 3.11") == ["python", "11"]
+def test_digitos_soltos_sao_guardados():
+    """Decisao invertida: a escola organiza-se por modulos, e "modulo 3"
+    perdia justamente o 3 - a parte que distinguia a consulta."""
+    assert tokenizar("Python 3.11") == ["python", "3", "11"]
+    assert tokenizar("modulo 3 de fisica") == ["modulo", "3", "fisica"]
 
 
-def test_tokens_de_um_caractere_removidos():
-    assert tokenizar("a C 3 programação", remover_stop_words=False) == ["programacao"]
+def test_letras_soltas_continuam_a_cair():
+    """O comprimento minimo existe para letras: uma nao diz nada."""
+    assert tokenizar("a C programação", remover_stop_words=False) == ["programacao"]
+
+
+def test_ordinal_reduz_ao_numero():
+    """"10o ano" e "10 ano" tem de casar: o corpus escreve um, o aluno o outro."""
+    assert tokenizar("MANUAIS ADOPTADOS 10º ano") == ["manuais", "adoptados", "10", "ano"]
+    assert tokenizar("manuais adotados 10 ano") == ["manuais", "adotados", "10", "ano"]
+
+
+def test_camel_nao_parte_digito_de_letra():
+    """"3D" nao e camelCase; parti-lo deixava so o "3"."""
+    assert tokenizar("modelação 3D") == ["modelacao", "3d"]
+    assert tokenizar("FichaRevisoes") == ["ficha", "revisoes"]
 
 
 def test_stop_words_estao_normalizadas():

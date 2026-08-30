@@ -58,3 +58,38 @@ def test_vocabulario_vazio_nao_expande():
 def test_limite_de_variantes():
     vocab = {"licao", "licoes", "licaos", "licaes"}
     assert len(morfologia.variantes("licao", vocab)) <= morfologia.MAXIMO_VARIANTES
+
+
+VOCAB_GRAFIA = {
+    "adotados", "adoptados", "atividades", "actividades",
+    "objetivo", "objectivo", "protecao", "proteccao",
+    "percecao", "percepcao", "apto", "ato", "atos",
+}
+
+
+def test_grafia_nova_encontra_a_antiga():
+    """Os documentos da escola sao anteriores ao acordo de 1990; os alunos nao."""
+    assert "adoptados" in morfologia.variantes("adotados", VOCAB_GRAFIA)
+    assert "actividades" in morfologia.variantes("atividades", VOCAB_GRAFIA)
+    assert "objectivo" in morfologia.variantes("objetivo", VOCAB_GRAFIA)
+
+
+def test_grafia_antiga_encontra_a_nova():
+    assert "adotados" in morfologia.variantes("adoptados", VOCAB_GRAFIA)
+    assert "atividades" in morfologia.variantes("actividades", VOCAB_GRAFIA)
+
+
+def test_consoante_muda_antes_de_c_e_cedilha():
+    assert "proteccao" in morfologia.variantes("protecao", VOCAB_GRAFIA)
+    assert "percepcao" in morfologia.variantes("percecao", VOCAB_GRAFIA)
+
+
+def test_palavras_curtas_nao_colidem():
+    """"apto" e "ato" sao palavras diferentes: o p nao e mudo."""
+    assert morfologia.variantes("apto", VOCAB_GRAFIA) == {"apto"}
+    assert "apto" not in morfologia.variantes("ato", VOCAB_GRAFIA)
+
+
+def test_grafia_nao_inventa_palavras():
+    """A regra propoe, o vocabulario decide - como no resto do modulo."""
+    assert morfologia.variantes("atividades", {"atividades"}) == {"atividades"}

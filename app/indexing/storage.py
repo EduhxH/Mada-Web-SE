@@ -48,6 +48,16 @@ def _migrar(conexao: sqlite3.Connection) -> None:
             conexao.execute(
                 "ALTER TABLE documents ADD COLUMN disciplina TEXT NOT NULL DEFAULT ''"
             )
+    if "data" not in colunas:
+        with conexao:
+            conexao.execute(
+                "ALTER TABLE documents ADD COLUMN data TEXT NOT NULL DEFAULT ''"
+            )
+    if "contexto" not in colunas:
+        with conexao:
+            conexao.execute(
+                "ALTER TABLE documents ADD COLUMN contexto TEXT NOT NULL DEFAULT ''"
+            )
 
 
 def salvar_indice(
@@ -61,10 +71,14 @@ def salvar_indice(
         conexao.execute("DELETE FROM terms")
         conexao.execute("DELETE FROM documents")
         conexao.executemany(
-            "INSERT INTO documents (id, titulo, origem, texto, tamanho, disciplina)"
-            " VALUES (?, ?, ?, ?, ?, ?)",
+            "INSERT INTO documents"
+            " (id, titulo, origem, texto, tamanho, disciplina, data, contexto)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             [
-                (d.id, d.titulo, d.origem, d.texto, tamanhos[d.id], d.disciplina)
+                (
+                    d.id, d.titulo, d.origem, d.texto,
+                    tamanhos[d.id], d.disciplina, d.data, d.contexto,
+                )
                 for d in documentos
             ],
         )
@@ -101,7 +115,8 @@ def contar_documentos(conexao: sqlite3.Connection) -> int:
 
 def carregar_documento(conexao: sqlite3.Connection, doc_id: int) -> Documento:
     linha = conexao.execute(
-        "SELECT id, titulo, texto, origem, disciplina FROM documents WHERE id = ?",
+        "SELECT id, titulo, texto, origem, disciplina, data, contexto"
+        " FROM documents WHERE id = ?",
         (doc_id,),
     ).fetchone()
     if linha is None:
@@ -112,6 +127,8 @@ def carregar_documento(conexao: sqlite3.Connection, doc_id: int) -> Documento:
         texto=linha[2],
         origem=linha[3],
         disciplina=linha[4],
+        data=linha[5],
+        contexto=linha[6],
     )
 
 
@@ -126,8 +143,8 @@ def carregar_documentos(
         lote = doc_ids[inicio : inicio + LOTE_MAXIMO]
         marcadores = ",".join("?" * len(lote))
         linhas = conexao.execute(
-            "SELECT id, titulo, texto, origem, disciplina FROM documents"
-            f" WHERE id IN ({marcadores})",
+            "SELECT id, titulo, texto, origem, disciplina, data, contexto"
+            f" FROM documents WHERE id IN ({marcadores})",
             lote,
         ).fetchall()
         for linha in linhas:
@@ -137,6 +154,8 @@ def carregar_documentos(
                 texto=linha[2],
                 origem=linha[3],
                 disciplina=linha[4],
+                data=linha[5],
+                contexto=linha[6],
             )
     return encontrados
 
