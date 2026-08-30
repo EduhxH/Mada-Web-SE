@@ -612,10 +612,11 @@ class _Manipulador(BaseHTTPRequestHandler):
             uso.registar(registo, participante, uso.EVENTO_ENTRADA)
         self.send_response(303)
         self.send_header("Location", "/")
+        seguro = "; Secure" if protecao.veio_por_tunel(self) else ""
         self.send_header(
             "Set-Cookie",
-            f"{auth.NOME_COOKIE}={sessao}; Path=/; HttpOnly; SameSite=Lax;"
-            f" Max-Age={auth.VALIDADE_DIAS * 86400}",
+            f"{auth.NOME_COOKIE}={sessao}; Path=/; HttpOnly; SameSite=Lax"
+            f"{seguro}; Max-Age={auth.VALIDADE_DIAS * 86400}",
         )
         self.send_header("Content-Length", "0")
         self.end_headers()

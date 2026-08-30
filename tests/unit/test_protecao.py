@@ -111,3 +111,31 @@ def test_cabecalhos_de_seguranca_essenciais():
     ):
         assert chave in protecao.CABECALHOS_SEGURANCA
     assert protecao.CABECALHOS_SEGURANCA["X-Frame-Options"] == "DENY"
+
+
+def test_tunel_reconhecido_pelo_cabecalho_da_cloudflare():
+    pedido = _PedidoFalso("127.0.0.1", {"CF-Connecting-IP": "203.0.113.9"})
+    assert protecao.veio_por_tunel(pedido)
+
+
+def test_tunel_reconhecido_pelo_protocolo_encaminhado():
+    pedido = _PedidoFalso("127.0.0.1", {"X-Forwarded-Proto": "https"})
+    assert protecao.veio_por_tunel(pedido)
+
+
+def test_rede_local_em_http_nao_e_tunel():
+    """Sem isto o cookie sairia Secure na rede local e ninguem entrava."""
+    assert not protecao.veio_por_tunel(_PedidoFalso("192.168.1.50"))
+    assert not protecao.veio_por_tunel(_PedidoFalso("127.0.0.1"))
+    assert not protecao.veio_por_tunel(
+        _PedidoFalso("127.0.0.1", {"X-Forwarded-Proto": "http"})
+    )
+
+
+def test_cabecalhos_de_tunel_forjados_de_fora_sao_ignorados():
+    """Alguem na rede local a fingir que ha HTTPS nao muda nada."""
+    pedido = _PedidoFalso(
+        "198.51.100.7",
+        {"CF-Connecting-IP": "1.1.1.1", "X-Forwarded-Proto": "https"},
+    )
+    assert not protecao.veio_por_tunel(pedido)

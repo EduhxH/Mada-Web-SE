@@ -110,3 +110,23 @@ def endereco_do_pedido(manipulador) -> str:
         if real:
             return real.strip()[:45]
     return ligacao
+
+
+def veio_por_tunel(manipulador) -> bool:
+    """Se o pedido chegou pelo tunel, o browser falou HTTPS ate a Cloudflare.
+
+    Serve para marcar o cookie de sessao como Secure so quando ha mesmo
+    HTTPS: na rede local, em http simples, um cookie Secure nunca seria
+    enviado e ninguem conseguiria entrar.
+
+    Mesma regra de confianca de endereco_do_pedido: os cabecalhos so contam
+    quando a ligacao e local. De fora, qualquer um os forjava para nos
+    convencer de que existe HTTPS onde nao existe.
+    """
+    ligacao = manipulador.client_address[0]
+    if ligacao not in ("127.0.0.1", "::1"):
+        return False
+    if manipulador.headers.get("CF-Connecting-IP"):
+        return True
+    protocolo = manipulador.headers.get("X-Forwarded-Proto") or ""
+    return protocolo.strip().lower() == "https"

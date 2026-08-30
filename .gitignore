@@ -34,3 +34,6 @@ data/uso.sqlite3
 *.db
 *.sqlite
 *.sqlite3
+
+# Arvore de trabalho do ramo gh-pages (pagina de reencaminhamento)
+.gh-pages/

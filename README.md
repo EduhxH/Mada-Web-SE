@@ -54,7 +54,7 @@ It crawls the school website (respecting `robots.txt`, rate limits and depth), i
 
 Queries are answered with graceful relaxation — all terms, then a quorum, then any — ranked by TF-IDF with a title boost, expanded across singular/plural variants, and grouped into sections so results stay legible.
 
-**Current corpus: 1,797 documents, 18,135 unique terms** — 1,010 pages and PDFs crawled from the school site plus 787 documents across 11 course subjects. Queries run in single-digit milliseconds.
+**Current corpus: 1,761 documents, 18,125 unique terms** — 1,010 pages and PDFs crawled from the school site plus 751 documents synced from Moodle across 10 course subjects. Queries run in single-digit milliseconds.
 
 The engine is a **catalogue, not a repository**: results link back to where the document actually lives. Nothing is republished, and no personal data is ever indexed.
 
@@ -80,14 +80,16 @@ Zero search APIs. Every result is computed here.
 | 🔗 **Click to Open** | Results link straight to the source file, served by the engine — PDFs open at the exact page, files inside ZIPs are read in memory. Lookup is by document id, never by user-supplied path. | ✅ Done |
 | 🪜 **Graceful Relaxation** | Three levels — all terms, then a quorum of `max(2, ⌈0.6q⌉)`, then any term — stepping down only until results appear. One counting pass yields every level. | ✅ Done |
 | ✅ **Auto-correction** | Typos at edit distance 1 whose correction is backed by 3+ documents are applied automatically, with a one-click escape back to the literal query. | ✅ Done |
-| 🛡️ **Hardened for Exposure** | Rate limiting (120/min, 5 login attempts per 15 min) keyed on the real client IP behind a tunnel, connection timeouts, security headers, filename sanitisation against header injection, and admin-only access to identifying statistics. | ✅ Done |
+| 🛡️ **Hardened for Exposure** | Rate limiting (120/min, 5 login attempts per 15 min) keyed on the real client IP behind a tunnel, connection timeouts, security headers, filename sanitisation against header injection, and admin-only access to identifying statistics. Forged proxy headers are ignored unless the connection is genuinely local. | ✅ Done |
+| 🌍 **Public Access via Tunnel** | Cloudflare Tunnel exposes the engine without opening a single router port — the app stays bound to `127.0.0.1` and `cloudflared` makes the outbound connection. Session cookies gain the `Secure` flag only when the request actually arrived over HTTPS, so local-network testing keeps working. | ✅ Done |
+| 🔗 **Stable Public Link** | `scripts/publicar_tunel.py` starts the tunnel, captures the freshly assigned address and republishes a redirect page to GitHub Pages, so the address handed to students never changes even though the tunnel's own name does. | ✅ Done |
 | 🎓 **Moodle Connector** | Authenticated session against the school's Moodle (credentials from a git-ignored `.env`), syncing 751 documents across 12 enrolled courses — resources, folders, pages and books only, never forums, quizzes or submissions. Ships with a `--diagnostico` mode that inspects real folder pages instead of guessing their HTML. | ✅ Done |
 | 🔄 **One-command Update** | `python main.py atualizar` crawls the site, reindexes everything and reports what changed — new, modified, removed, unchanged. The crawler writes to a staging folder and swaps atomically, so an interrupted run never damages a working corpus. | ✅ Done |
 | 🔑 **Stable Document Ids** | Ids are derived from the document's origin, not from read order, so reindexing after new material arrives never shifts them — the recorded click history keeps pointing at the right documents. | ✅ Done |
 | 🔁 **Morphological Expansion** | Singular/plural variants are added to the query — rules propose, the index vocabulary decides, so nothing is ever invented. Fixes 25% of the vocabulary being duplicated by number, without the information loss of stemming. | ✅ Done |
 | ⬆️ **Title Boost** | A hit in the title outweighs one in the body — the title says what a document *is*, the body only what it mentions. Applied after ranking, at no extra I/O cost. | ✅ Done |
 | 📊 **TF-IDF Ranking** | TF = freq / doc length, IDF = log(N / df); rare terms weigh more, long documents don't win by length alone. | ✅ Done |
-| 🧪 **Oracle-verified Tests** | 310 pytest tests; the integration suite proves the index returns exactly what the naive search returns. | ✅ Done |
+| 🧪 **Oracle-verified Tests** | 314 pytest tests; the integration suite proves the index returns exactly what the naive search returns. | ✅ Done |
 | ⏱️ **Naive vs. Indexed Benchmark** | `scripts/comparar_busca.py` times both paths on the real corpus and checks they agree. | ✅ Done |
 | 💻 **CLI** | `indexar` / `buscar` subcommands plus an interactive prompt with context snippets. | ✅ Done |
 | 🖥️ **Local Web UI** | Plain, dependency-free search page (standard-library HTTP server, term highlighting): `python main.py web`. | ✅ Done |
@@ -115,7 +117,10 @@ Zero search APIs. Every result is computed here.
 | zipfile (stdlib) | Reads archives in memory — no extraction to disk, no zip-slip risk |
 | pytest | Automated unit and integration tests |
 | dataclasses / Counter / regex / unicodedata | Standard-library building blocks — no framework |
-| requests + BeautifulSoup | HTTP fetching and HTML parsing |
+| requests + BeautifulSoup | HTTP fetching, HTML parsing and the Moodle session |
+| hmac / hashlib (stdlib) | Hashed invite codes, signed sessions, stable document ids |
+| Cloudflare Tunnel | Public access with no inbound port open on the network |
+| GitHub Pages | Stable redirect page in front of the tunnel's changing address |
 | Docker | Containerization (planned) |
 
 ---
@@ -153,12 +158,13 @@ Measured in practice:
 ## 🏗️ Architecture Overview
 
 ```
- School website                    Course material
- (crawler: queue + visited          (.pdf .docx .pptx .txt
-  set + robots.txt + depth)          .cs .md, also inside .zip)
-      │                                   │
-      └───────────────┬───────────────────┘
-                      ▼
+ School website          Moodle courses           Course material
+ (crawler: queue +       (authenticated sync:      (.pdf .docx .pptx .txt
+  visited set +           resources, folders,       .cs .md, also inside
+  robots.txt + depth)     pages, books)             .zip)
+      │                        │                          │
+      └────────────────────────┼──────────────────────────┘
+                               ▼
  Document source  ──  one Documento per page / slide / web page
       │
       ▼
@@ -186,8 +192,13 @@ Measured in practice:
       │
       ▼
  CLI  /  Web UI  ──  title, score, snippet, preview, click-through
-                     (web UI closed behind per-participant invite codes,
-                      every search and click logged for analytics)
+      │              (web UI closed behind per-participant invite codes,
+      │               every search and click logged for analytics)
+      ▼
+ Cloudflare Tunnel  ──  outbound only; no router port is ever opened
+      │
+      ▼
+ GitHub Pages  ──  stable link that survives the tunnel being renamed
 ```
 
 ---
@@ -217,9 +228,12 @@ python -m venv .venv
 **4. Index everything** (crawled pages + local course material)
 
 ```bash
-.venv\Scripts\python main.py indexar data
-aw
+.venv\Scripts\python main.py indexar data/raw
 ```
+
+Point it at `data/raw`, never at `data` — the parent holds the signing key and
+the participant file, and the loader refuses them by name, but the narrower
+path is the real guard.
 
 **5. Search from the terminal**
 
@@ -250,7 +264,33 @@ Codes are shown **once** and stored only as an HMAC hash. To replace a lost one:
 Add `--host 0.0.0.0` to accept connections from other devices. Access is
 closed: every route but the login page requires a valid code.
 
-**7. Tests, benchmark and usage stats**
+**7. Publish it** (optional — needs [`cloudflared`](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/))
+
+```bash
+winget install --id Cloudflare.cloudflared -e
+```
+
+With the web UI already running on port 8080, in a second terminal:
+
+```bash
+.venv\Scripts\python scripts\publicar_tunel.py
+```
+
+This opens a Cloudflare Tunnel, reads back the address it was assigned, and
+pushes a redirect page to the `gh-pages` branch. No router port is ever
+opened: the app stays on `127.0.0.1` and `cloudflared` dials out.
+
+Accounts-less tunnels get a **new random address on every start**, which is
+why the redirect page exists — participants keep one bookmark, the script
+repoints it. Enable GitHub Pages once (*Settings → Pages → Deploy from a
+branch → `gh-pages` → `/ (root)`*) and the stable address is
+`https://<user>.github.io/<repo>/`.
+
+Pass `--sem-publicar` to open the tunnel without touching GitHub. Note that
+Cloudflare offers **no uptime guarantee** on accountless tunnels; a named
+tunnel bound to your own domain is the durable option.
+
+**8. Tests, benchmark and usage stats**
 
 ```bash
 .venv\Scripts\python -m pytest
@@ -273,31 +313,44 @@ Mada-Web-SE/
 ├── app/
 │   ├── crawler/
 │   │   ├── web_source.py        # BFS crawler: frontier, robots.txt, sitemap, PDFs
-│   │   └── local_source.py      # Local files (txt/md/cs/pdf/docx/pptx/html, zip)
+│   │   ├── local_source.py      # Local files (txt/md/cs/pdf/docx/pptx/html, zip)
+│   │   └── moodle.py            # Authenticated Moodle sync (credentials from .env)
 │   ├── indexing/
 │   │   ├── tokenizer.py         # Normalization + tokenization rules
 │   │   ├── inverted_index.py    # term → {doc_id: freq} builder
-│   │   └── storage.py           # SQLite schema and persistence
+│   │   ├── storage.py           # SQLite schema and persistence
+│   │   ├── atualizacao.py       # Reindex with new/changed/removed detection
+│   │   └── pos.py               # Suffix-rule Portuguese POS tagger
 │   ├── search/
 │   │   ├── naive.py             # O(n×m) baseline and test oracle
-│   │   ├── query.py             # AND/OR search, discipline filter, suggestions
+│   │   ├── query.py             # Relaxation, discipline filter, auto-correction
 │   │   ├── ranker.py            # TF-IDF + coordination factor
 │   │   ├── spelling.py          # Levenshtein distance and suggestions
+│   │   ├── morfologia.py        # Singular/plural expansion, vocabulary-checked
+│   │   ├── seccoes.py           # Result grouping into readable sections
+│   │   ├── temas.py             # Discipline-level TF-IDF topic extraction
+│   │   ├── sugestoes.py         # Query suggestions (history + popular + vocab)
 │   │   └── snippet.py           # Context snippet extraction
 │   ├── interface/
 │   │   ├── web.py               # HTTP server, routes, session handling
 │   │   ├── auth.py              # Invite codes (hashed) and signed sessions
+│   │   ├── protecao.py          # Rate limiting, security headers, tunnel detection
 │   │   ├── preview.py           # Result preview fragments
+│   │   ├── disciplina.py        # Discipline landing page
 │   │   └── estatisticas.py      # Analytics page with hand-built SVG charts
 │   ├── analytics/
 │   │   └── uso.py               # Usage event log and aggregations
 │   └── models/
-│       └── document.py          # Immutable Documento record
+│       ├── document.py          # Immutable Documento record
+│       └── classificacao.py     # Shared patterns (breaks an import cycle)
 ├── data/                        # Corpus, index, secrets — all git-ignored
-├── scripts/comparar_busca.py    # Naive vs. indexed benchmark
-├── tests/{unit,integration}/    # 287 tests
+├── scripts/
+│   ├── comparar_busca.py        # Naive vs. indexed benchmark
+│   ├── publicar_tunel.py        # Tunnel + stable redirect page
+│   └── pagina_publica.html      # Redirect page template
+├── tests/{unit,integration}/    # 314 tests
 ├── main.py                      # CLI entry point
-└── .env.example                 # MADALENA_SEGREDO for deployment
+└── .env.example                 # Signing key and Moodle credentials
 ```
 
 ---
@@ -332,6 +385,11 @@ Mada-Web-SE/
 - [x] Tolerant search: quorum relaxation, auto-correction, title boosting
 - [x] Morphological query expansion (singular/plural), validated against the index
 - [x] HTML parsing with BeautifulSoup
+- [x] Authenticated Moodle connector syncing enrolled courses automatically
+- [x] Hardening for public exposure: rate limits, security headers, forged-header rejection
+- [x] Self-hosted deployment over Cloudflare Tunnel, with a stable redirect link
+- [ ] Named tunnel on an owned domain (no more address churn)
+- [ ] Pagination — stop hydrating every result to display twenty
 - [ ] OR queries, exact phrases, stemming
 - [ ] Docker image and compose setup
 - [ ] Reimplement selected modules in TypeScript and Go for comparison
@@ -340,16 +398,25 @@ Mada-Web-SE/
 
 ## ⚠️ Known Limitations
 
-- **Moodle and Teams are not connected yet.** Course material is currently
-  downloaded by hand, so it goes stale. Automatic sync needs API access
-  granted by an administrator — the engine will never automate a student
-  login or scrape with someone's credentials.
+- **Teams is not connected yet.** Some teachers post work there, so those
+  documents are still missing. Moodle sync is done; Teams is not.
+- **Moodle sync runs as one account.** The connector authenticates with the
+  developer's own student credentials, kept in a git-ignored `.env`, and can
+  therefore only reach the courses that account is enrolled in — the PSI
+  syllabus. Extending coverage to other classes means an administrator-issued
+  token, not more student passwords.
 - **Scanned documents are invisible.** A photographed worksheet has no text
   layer; OCR is out of scope for now.
 - **All results are hydrated before paging.** A 167-result query loads every
   document's text to display 20. Harmless at this size; pagination is the fix.
-- **Plain HTTP.** Over a local network the access code travels in clear text;
-  serving beyond localhost should go through an HTTPS tunnel.
+- **HTTPS only through the tunnel.** Traffic is encrypted end to end when it
+  arrives via Cloudflare, and the session cookie is marked `Secure` on exactly
+  those requests. Served directly over a local network with `--host 0.0.0.0`
+  it is still plain HTTP, and the access code travels in clear text.
+- **The public address is not permanent.** Accountless tunnels are renamed on
+  every restart and carry no uptime guarantee. The redirect page hides the
+  churn from participants, but a named tunnel on an owned domain is what
+  actually makes the address durable.
 - **No semantic matching.** Paraphrases ("how do I justify an absence") do not
   reach documents phrased differently. Morphological expansion covers number,
   spelling suggestions cover typos, but synonyms and rewording are out of reach
