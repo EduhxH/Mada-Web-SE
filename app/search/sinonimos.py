@@ -28,6 +28,9 @@ GRUPOS = (
 # Um sinonimo em mais de 10% da colecao nao distingue nada: acrescenta-lo so
 # dilui. Fracao e nao numero absoluto, para continuar a valer quando o corpus
 # crescer em setembro.
+# Nao acrescentar grupos sem os medir. Tentei inicio/comeco para apanhar
+# "quando comecam as aulas": nao mexeu na regua, e com os sinonimos
+# sempre ligados essa consulta passava de 27o a nao-encontrada.
 TETO_FREQUENCIA = 0.10
 MAXIMO_SINONIMOS = 3
 

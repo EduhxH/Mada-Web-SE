@@ -71,8 +71,24 @@ def test_pagina_de_estatisticas_gera_html(tmp_path):
     conexao = _registo(tmp_path)
     uso.registar(conexao, "aluno-01", uso.EVENTO_BUSCA, consulta="ficha", resultados=2)
     pagina = estatisticas.pagina(conexao)
-    assert "<svg" in pagina
     assert "estatisticas" in pagina
+    assert "1" in pagina  # o cartao das buscas
+    # Com um dia so nao ha grafico: uma barra sozinha nao compara nada.
+    assert "<svg" not in pagina
+
+
+def test_grafico_aparece_quando_ha_dias_que_cheguem(tmp_path):
+    from app.interface import estatisticas
+
+    conexao = _registo(tmp_path)
+    for dia in ("2026-09-15", "2026-09-16", "2026-09-17"):
+        conexao.execute(
+            "INSERT INTO eventos (momento, dia, participante, tipo, consulta,"
+            " resultados) VALUES (?,?,?,?,?,?)",
+            (f"{dia}T10:00:00+00:00", dia, "aluno-01", uso.EVENTO_BUSCA, "x", 1),
+        )
+    conexao.commit()
+    assert "<svg" in estatisticas.pagina(conexao)
 
 
 def test_pagina_escapa_consultas(tmp_path):
@@ -121,3 +137,31 @@ def test_consulta_de_dois_participantes_e_visivel(tmp_path):
             conexao, aluno, uso.EVENTO_BUSCA, consulta="ficha comum", resultados=0
         )
     assert "ficha comum" in estatisticas.pagina(conexao)
+
+
+def test_grafico_nao_se_desenha_com_poucos_dias(tmp_path):
+    """Uma barra sozinha a ocupar a altura toda parece avaria, nao informacao."""
+    from app.interface import estatisticas
+
+    with_um = estatisticas._barras([("2026-09-15", 62)], "Buscas por dia")
+    assert "<svg" not in with_um
+    assert "62" in with_um and "2026-09-15" in with_um
+
+    com_tres = estatisticas._barras(
+        [("d1", 5), ("d2", 9), ("d3", 2)], "Buscas por dia"
+    )
+    assert "<svg" in com_tres
+
+
+def test_grafico_sem_dados_continua_a_dizer_isso(tmp_path):
+    from app.interface import estatisticas
+
+    assert "Sem dados ainda" in estatisticas._barras([], "Buscas por dia")
+
+
+def test_resumo_curto_escapa_rotulos():
+    from app.interface import estatisticas
+
+    saida = estatisticas._barras([("<script>", 3)], "T")
+    assert "<script>" not in saida
+    assert "&lt;script&gt;" in saida

@@ -4,7 +4,7 @@ import time
 from pathlib import Path
 
 from app.crawler.local_source import MOTIVO_PRIVADO, Relatorio, carregar
-from app.crawler import moodle
+from app.crawler import horarios, moodle
 from app.models import novidades
 from app.crawler.web_source import rastrear
 from app.analytics import uso
@@ -192,6 +192,40 @@ def comando_atualizar(
         print("O corpus esta igual ao da ultima atualizacao.")
 
     imprimir_relatorio(relatorio)
+
+
+def comando_horario(forcar: bool = False) -> None:
+    """Vigia o PDF de horarios da escola, que muda todas as semanas."""
+    from datetime import datetime
+
+    agora = datetime.now()
+    estado = horarios.ler_estado()
+    if not forcar:
+        vale, motivo = horarios.deve_verificar(agora, estado)
+        if not vale:
+            print(f"Nada a fazer: {motivo}.")
+            if estado.get("ultima_mudanca"):
+                print(f"  ultimo horario novo em {estado['ultima_mudanca']}")
+            return
+
+    try:
+        url_base, utilizador, senha = moodle.configuracao()
+        sessao = moodle.iniciar_sessao(url_base, utilizador, senha)
+    except moodle.ErroMoodle as erro:
+        print(f"  {erro}")
+        return
+    except Exception as erro:
+        print(f"  Falhou a entrada no Moodle: {erro}")
+        return
+
+    resultado = horarios.verificar(sessao, url_base, agora, forcar=forcar)
+    print(resultado.motivo.capitalize() + ".")
+    if resultado.mudou:
+        mb = resultado.bytes_guardados / 1024 / 1024
+        print(f"  guardado em {horarios.PASTA} ({mb:.1f} MB)")
+        print()
+        print("Falta reindexar para ficar pesquisavel:")
+        print("  python main.py atualizar --sem-rastreio")
 
 
 def comando_verificar_moodle(
@@ -511,6 +545,14 @@ def main() -> None:
         "--diagnostico", action="store_true",
         help="inspeciona a pagina de uma pasta e mostra a sua estrutura",
     )
+    p_horario = subcomandos.add_parser(
+        "horario", help="vigia o PDF de horarios da escola (muda toda a semana)"
+    )
+    p_horario.add_argument(
+        "--forcar", action="store_true",
+        help="verifica agora, fora da janela de quinta a domingo",
+    )
+
     p_moodle.add_argument(
         "--verificar", action="store_true",
         help="procura material novo e descarrega so esse (rapido)",
@@ -547,6 +589,8 @@ def main() -> None:
             argumentos.diagnostico,
             argumentos.verificar,
         )
+    elif argumentos.comando == "horario":
+        comando_horario(argumentos.forcar)
     elif argumentos.comando == "atualizar":
         comando_atualizar(
             argumentos.url,

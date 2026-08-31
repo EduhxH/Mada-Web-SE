@@ -19,6 +19,28 @@ STOP_WORDS = frozenset(
     """.split()
 )
 
+# Palavras com que se faz uma PERGUNTA, e que nada dizem sobre o assunto dela.
+#
+# Sao aqui um problema pior do que parece, e por uma razao do avesso: numa
+# coleccao de documentos escolares estas palavras sao RARAS - "vejo" aparece
+# em 1 documento, "devo" em 3, "posso" e "tenho" em 5 - e o TF-IDF premeia
+# exactamente o que e raro. "Quantas faltas posso ter" era decidido por
+# "quantas" e "posso", e devolvia um manual de TIC.
+#
+# Os alunos escrevem perguntas. Sem isto, quanto mais natural a pergunta,
+# pior a resposta.
+PALAVRAS_DE_PERGUNTA = frozenset(
+    """
+    quando onde quanto quanta quantos quantas qual quais quem porque
+    posso preciso quero tenho vejo devo faco sei queria gostava consigo
+    meu minha meus minhas
+    ter tem temos fazer faz pode podem deve devem saber sabe estar
+    ver procurar encontrar achar arranjar baixar descarregar
+    """.split()
+)
+
+STOP_WORDS = STOP_WORDS | PALAVRAS_DE_PERGUNTA
+
 _PADRAO_TOKEN = re.compile(r"[a-z0-9]+")
 # FichaRevisoes -> Ficha Revisoes; GestCampeonato -> Gest Campeonato.
 # Sem isto, nomes de ficheiro sem espacos viram um unico token inutil.

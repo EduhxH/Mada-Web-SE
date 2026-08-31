@@ -139,3 +139,20 @@ def test_cabecalhos_de_tunel_forjados_de_fora_sao_ignorados():
         {"CF-Connecting-IP": "1.1.1.1", "X-Forwarded-Proto": "https"},
     )
     assert not protecao.veio_por_tunel(pedido)
+
+
+def test_limite_por_participante_nao_pune_a_turma():
+    """A turma na rede da escola sai toda pelo mesmo IP publico. Contar so
+    por endereco tratava oito alunos a estudar como um bot."""
+    limitador = protecao.Limitador(maximo=3, janela=60)
+    for participante in ("p:aluno-01", "p:aluno-02", "p:aluno-03"):
+        assert all(limitador.permitir(participante) for _ in range(3))
+        assert not limitador.permitir(participante)
+
+
+def test_quem_nao_entrou_continua_contado_por_endereco():
+    """Antes da sessao nao ha identidade: e a porta da forca bruta."""
+    limitador = protecao.Limitador(maximo=2, janela=60)
+    assert limitador.permitir("198.51.100.7")
+    assert limitador.permitir("198.51.100.7")
+    assert not limitador.permitir("198.51.100.7")

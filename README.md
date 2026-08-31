@@ -54,7 +54,7 @@ It crawls the school website (respecting `robots.txt`, rate limits and depth), i
 
 Queries are answered with graceful relaxation — all terms, then a quorum, then any — ranked by TF-IDF with a title boost, expanded across singular/plural variants, and grouped into sections so results stay legible.
 
-**Current corpus: 1,761 documents, 18,095 unique terms** — 1,010 pages and PDFs crawled from the school site plus 751 documents synced from Moodle across 10 course subjects. Queries run in single-digit milliseconds.
+**Current corpus: 1,803 documents, 18,082 unique terms** — 1,010 pages and PDFs crawled from the school site plus 751 documents synced from Moodle across 10 course subjects. Queries run in single-digit milliseconds.
 
 The engine is a **catalogue, not a repository**: results link back to where the document actually lives. Nothing is republished, and no personal data is ever indexed.
 
@@ -85,13 +85,17 @@ Zero search APIs. Every result is computed here.
 | 🔗 **Stable Public Link** | `scripts/publicar_tunel.py` starts the tunnel, captures the freshly assigned address and republishes a redirect page to GitHub Pages, so the address handed to students never changes even though the tunnel's own name does. | ✅ Done |
 | 🎓 **Moodle Connector** | Authenticated session against the school's Moodle (credentials from a git-ignored `.env`), syncing 751 documents across 12 enrolled courses — resources, folders, pages and books only, never forums, quizzes or submissions. Ships with a `--diagnostico` mode that inspects real folder pages instead of guessing their HTML. | ✅ Done |
 | 🔔 **New-material Detection** | `moodle --verificar` polls one page per course — about 14 requests and 13 seconds, against the hundreds of a full sync — compares the modules on offer against what is already held, and downloads only what is genuinely new. Modules that yield nothing are remembered as examined, so barren folders are not re-announced every day. | ✅ Done |
+| 🕐 **Timetable Watcher** | The school timetable changes *every week* and is published Thursday or Friday afternoon at a fixed Moodle URL. A `HEAD` request compares the ETag; only a changed file is downloaded. The watch window follows how the school actually works — Thursday and Friday from noon, all weekend if it did not appear on either — and once a week's timetable is caught the server is left alone until the next Thursday. The rule lives in code, not in the scheduler, so it is testable. | ✅ Done |
+| ❓ **Questions Answered as Questions** | Students write questions, and the framing words of a question are *rare* in a document collection — "vejo" appears in 1 document, "posso" in 5 — so TF-IDF rewarded exactly the words that say nothing about the subject. "Quantas faltas posso ter" was decided by *quantas* and *posso*. Interrogatives, first-person verbs and auxiliaries are now stop words, leaving the subject behind. Five question-shaped queries went from unanswered to answered. | ✅ Done |
+| 🔤 **Abbreviations** | PAP appears in 129 documents and "prova de aptidão" in 37 — *different* documents, because each author picked one form. A concept now spans both: the postings of the abbreviation plus documents containing every word of the expansion. The intersection matters; "trabalho" alone is in 554 documents. | ✅ Done |
+| ⚡ **Built for a Class at Once** | Measured with 20 concurrent students: 100 searches in 1.8 s, worst case 405 ms. Getting there meant finding that a single analytics write cost 322 ms (WAL and one shared connection fixed it) and that *serialising* index access made searches 30× faster — eight threads doing random reads on a mechanical disk pay a seek each, while one warm connection barely touches it. | ✅ Done |
 | 📰 **What's New** | Detected material surfaces in the interface as a discreet line on the search page and a dated listing at `/novidades`, each entry linking to a search for it. | ✅ Done |
 | 🔄 **One-command Update** | `python main.py atualizar` crawls the site, reindexes everything and reports what changed — new, modified, removed, unchanged. The crawler writes to a staging folder and swaps atomically, so an interrupted run never damages a working corpus. | ✅ Done |
 | 🔑 **Stable Document Ids** | Ids are derived from the document's origin, not from read order, so reindexing after new material arrives never shifts them — the recorded click history keeps pointing at the right documents. | ✅ Done |
 | 🔁 **Morphological Expansion** | Singular/plural variants and both sides of the 1990 orthographic reform (`adotados` ↔ `adoptados`) are added to the query — rules propose, the index vocabulary decides, so nothing is ever invented. 94 spelling pairs coexist in this corpus, school documents predating the reform and students not. A length floor keeps `apto` from collapsing into `ato`. | ✅ Done |
 | ⬆️ **Title Boost** | A hit in the title outweighs one in the body — the title says what a document *is*, the body only what it mentions. The weight was not chosen but swept from 0 to 10 against the evaluation set: the gain grows to 3.0 and plateaus, with no query regressing. Applied after ranking, at no extra I/O cost. | ✅ Done |
 | 📊 **TF-IDF Ranking** | TF = freq / doc length, IDF = log(N / df); rare terms weigh more, long documents don't win by length alone. | ✅ Done |
-| 🧪 **Oracle-verified Tests** | 402 pytest tests; the integration suite proves the index returns exactly what the naive search returns. | ✅ Done |
+| 🧪 **Oracle-verified Tests** | 437 pytest tests; the integration suite proves the index returns exactly what the naive search returns. | ✅ Done |
 | ⏱️ **Naive vs. Indexed Benchmark** | `scripts/comparar_busca.py` times both paths on the real corpus and checks they agree. | ✅ Done |
 | 💻 **CLI** | `indexar` / `buscar` subcommands plus an interactive prompt with context snippets. | ✅ Done |
 | 🖥️ **Local Web UI** | Plain, dependency-free search page (standard-library HTTP server, term highlighting): `python main.py web`. | ✅ Done |
@@ -326,7 +330,25 @@ rejected this way: semantic search, always-on synonyms, and indexing the
 Moodle folder names. Two were kept after sweeping their parameter rather than
 picking one: the title weight and the discipline partition.
 
-**9. Keep the corpus fresh automatically**
+**9. Watch the weekly timetable**
+
+```bash
+.venv\Scripts\python main.py horario
+```
+
+The timetable is a single 42-page PDF covering every class, replaced weekly at
+an unchanging Moodle address. The command decides for itself whether now is a
+moment worth checking, so the Windows Task Scheduler can simply run
+`scriptsigiar_horario.cmd` **every hour** and let the code hold the rule:
+
+```bash
+schtasks /create /tn "Madalena - horario" /tr "%CD%\scriptsigiar_horario.cmd" /sc hourly
+```
+
+Add `--forcar` to check outside the window. Reindexing only happens when the
+file actually changed.
+
+**10. Keep the corpus fresh automatically**
 
 Moodle offers no webhook to a student account, so freshness means asking —
 the trick is asking cheaply. `--verificar` fetches one page per course and
@@ -356,7 +378,7 @@ schtasks /create /tn "Madalena - verificar Moodle" /tr "%CD%\scripts\verificar_d
 Anything found appears in the web interface, on the search page and at
 `/novidades`.
 
-**10. Tests, benchmark and usage stats**
+**11. Tests, benchmark and usage stats**
 
 ```bash
 .venv\Scripts\python -m pytest
@@ -380,7 +402,8 @@ Mada-Web-SE/
 │   ├── crawler/
 │   │   ├── web_source.py        # BFS crawler: frontier, robots.txt, sitemap, PDFs
 │   │   ├── local_source.py      # Local files (txt/md/cs/pdf/docx/pptx/html, zip)
-│   │   └── moodle.py            # Authenticated Moodle sync (credentials from .env)
+│   │   ├── moodle.py            # Authenticated Moodle sync (credentials from .env)
+│   │   └── horarios.py          # Weekly timetable watcher
 │   ├── indexing/
 │   │   ├── tokenizer.py         # Normalization + tokenization rules
 │   │   ├── inverted_index.py    # term → {doc_id: freq} builder
@@ -395,6 +418,7 @@ Mada-Web-SE/
 │   │   ├── morfologia.py        # Number and 1990-spelling variants, vocabulary-checked
 │   ├── intencao.py          # Discipline and recency read from the question
 │   ├── sinonimos.py         # School jargon: ficha ≈ guião ≈ exercício
+│   ├── siglas.py            # PAP, FCT, TPC and what they stand for
 │   ├── agrupamento.py       # One result per file, not per page
 │   ├── hibrida.py           # Composes the pieces into one search
 │   ├── semantica.py         # Embeddings (built, measured, left off - see below)
@@ -425,8 +449,9 @@ Mada-Web-SE/
 │   ├── indexar_semantica.py     # Builds the embedding index
 │   ├── publicar_tunel.py        # Tunnel + stable redirect page
 │   ├── verificar_diario.cmd     # Scheduled Moodle check + reindex
+│   ├── vigiar_horario.cmd       # Hourly timetable watch
 │   └── pagina_publica.html      # Redirect page template
-├── tests/{unit,integration}/    # 402 tests
+├── tests/{unit,integration}/    # 437 tests
 ├── main.py                      # CLI entry point
 └── .env.example                 # Signing key and Moodle credentials
 ```
@@ -473,6 +498,9 @@ Mada-Web-SE/
 - [x] Publication dates from the Moodle connector
 - [x] One result per file instead of one per page
 - [ ] Pagination — stop hydrating every result to display twenty
+- [x] Weekly timetable watcher — the most-searched query finally has an answer
+- [x] Question-shaped queries, abbreviations, and a class-sized load test
+- [ ] Visual design pass on the interface
 - [ ] Capture the Moodle section name to tell same-named files apart
 - [ ] OR queries, exact phrases, stemming
 - [ ] Docker image and compose setup

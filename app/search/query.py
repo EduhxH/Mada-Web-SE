@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from app.indexing import storage
 from app.indexing.tokenizer import tokenizar
 from app.models.document import Documento
-from app.search import morfologia, sinonimos
+from app.search import morfologia, siglas, sinonimos
 from app.search.ranker import pontuar
 from app.search.spelling import distancia_edicao, sugerir
 
@@ -66,6 +66,22 @@ class ResultadoBusca:
 
 _cache_vocabulario: dict[int, set[str]] = {}
 _cache_frequencias: dict[int, dict[str, int]] = {}
+_cache_tamanhos: dict[int, dict[int, int]] = {}
+
+
+def _tamanhos(conexao) -> dict[int, int]:
+    """Tamanho de cada documento, que o TF-IDF divide pela frequencia.
+
+    Sem cache, as 1761 linhas eram lidas em cada busca - 13 ms, mais do que
+    a busca inteira custa depois. Sozinho nem se notava; com oito alunos em
+    simultaneo era o que dominava, e a mediana por busca subia de 20 ms para
+    quase meio segundo.
+    """
+    total = storage.contar_documentos(conexao)
+    if total not in _cache_tamanhos:
+        _cache_tamanhos.clear()
+        _cache_tamanhos[total] = storage.carregar_tamanhos(conexao)
+    return _cache_tamanhos[total]
 
 
 def _frequencias(conexao) -> dict[str, int]:
@@ -90,6 +106,7 @@ def _vocabulario(conexao) -> set[str]:
 def limpar_cache() -> None:
     _cache_vocabulario.clear()
     _cache_frequencias.clear()
+    _cache_tamanhos.clear()
 
 
 def _juntar(conexao, formas: set[str]) -> dict[int, int]:
@@ -125,7 +142,45 @@ def _carregar(
             for termo, irmaos in parentes.items():
                 for irmao in irmaos:
                     formas[termo] |= morfologia.variantes(irmao, vocabulario)
-    return {t: _juntar(conexao, f) for t, f in formas.items()}, formas
+    postings = {t: _juntar(conexao, f) for t, f in formas.items()}
+    _juntar_siglas(conexao, termos, formas, postings)
+    return postings, formas
+
+
+def _juntar_siglas(conexao, termos, formas, postings) -> None:
+    """Funde a sigla e a expressao por extenso num unico termo da consulta.
+
+    Sem isto, "formacao em contexto de trabalho" exigia as tres palavras e
+    ignorava os 63 documentos que dizem so "FCT"; e "trabalho para casa" nao
+    encontrava nada, porque o documento diz "TPC".
+
+    O conceito vale os documentos com a sigla MAIS os que tem todas as
+    palavras da expressao. A intersecao e essencial: "trabalho" sozinho esta
+    em 554 documentos, e a uniao ingenua trazia meio corpus.
+    """
+    for sigla, palavras, consumidos in siglas.detetar(set(termos)):
+        juntos = _juntar(conexao, morfologia.variantes(sigla, _vocabulario(conexao)))
+
+        por_palavra = [_juntar(conexao, {p}) for p in palavras]
+        if por_palavra and all(por_palavra):
+            comuns = set(por_palavra[0])
+            for outro in por_palavra[1:]:
+                comuns &= outro.keys()
+            for doc_id in comuns:
+                # Uma expressao ocorre, no maximo, tantas vezes como a sua
+                # palavra mais rara. Somar as frequencias inflacionava:
+                # "trabalho" aparece dezenas de vezes num documento que nem
+                # fala de trabalho para casa, e enterrava o que diz "TPC".
+                vezes = min(p.get(doc_id, 0) for p in por_palavra)
+                juntos[doc_id] = max(juntos.get(doc_id, 0), vezes)
+
+        if not juntos:
+            continue
+        for consumido in consumidos:
+            postings.pop(consumido, None)
+            formas.pop(consumido, None)
+        postings[sigla] = juntos
+        formas[sigla] = {sigla, *palavras}
 
 
 def _intersecao(postings_por_termo: dict[str, dict[int, int]]) -> set[int]:
@@ -237,7 +292,7 @@ def buscar_detalhado(
     if not candidatos:
         return base
 
-    tamanhos = storage.carregar_tamanhos(conexao)
+    tamanhos = _tamanhos(conexao)
     total = storage.contar_documentos(conexao)
     ranqueados = pontuar(postings_por_termo, candidatos, tamanhos, total)
     documentos = storage.carregar_documentos(

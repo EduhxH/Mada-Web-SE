@@ -72,3 +72,37 @@ def test_siglas_nao_sao_partidas():
 
 def test_camelcase_com_acentos():
     assert tokenizar("PlanificaçãoModular") == ["planificacao", "modular"]
+
+
+def test_palavras_de_pergunta_saem():
+    """O aluno escreve uma pergunta; o assunto dela e o que fica."""
+    assert tokenizar("quantas faltas posso ter") == ["faltas"]
+    assert tokenizar("onde vejo o meu horario") == ["horario"]
+    assert tokenizar("quais sao os criterios de avaliacao") == [
+        "criterios", "avaliacao"
+    ]
+
+
+def test_interrogativas_nao_decidem_a_busca():
+    """Sao raras no corpus - "vejo" em 1 documento, "posso" em 5 - e o TF-IDF
+    premeia o que e raro. Sem isto, decidiam a resposta."""
+    from app.indexing.tokenizer import PALAVRAS_DE_PERGUNTA, STOP_WORDS
+
+    for palavra in ("quando", "onde", "quantas", "posso", "vejo", "tenho"):
+        assert palavra in PALAVRAS_DE_PERGUNTA
+        assert palavra in STOP_WORDS
+
+
+def test_o_assunto_da_pergunta_sobrevive():
+    """Tirar o enquadramento nao pode levar o assunto atras."""
+    for consulta, esperado in (
+        ("quando comecam as aulas", {"comecam", "aulas"}),
+        ("como funciona o exame de recuperacao", {"funciona", "exame", "recuperacao"}),
+        ("onde estao as fichas de portugues", {"fichas", "portugues"}),
+    ):
+        assert set(tokenizar(consulta)) == esperado
+
+
+def test_consulta_so_de_enquadramento_fica_vazia():
+    """Nao ha assunto nenhum: melhor nada do que ruido."""
+    assert tokenizar("onde posso ver") == []

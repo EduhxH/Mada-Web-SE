@@ -6,9 +6,20 @@ LARGURA = 620
 ALTURA_BARRAS = 170
 
 
+# Abaixo disto um grafico de barras nao compara nada: com dois dias fica uma
+# barra sozinha a ocupar a altura toda, o que parece avaria e nao informacao.
+MINIMO_PARA_GRAFICO = 3
+
+
 def _barras(dados: list[tuple[str, int]], titulo: str, unidade: str = "") -> str:
     if not dados:
         return f"<h2>{html.escape(titulo)}</h2><p class='vazio'>Sem dados ainda.</p>"
+
+    if len(dados) < MINIMO_PARA_GRAFICO:
+        linhas = " &middot; ".join(
+            f"<b>{valor}</b> em {html.escape(str(rotulo))}" for rotulo, valor in dados
+        )
+        return f"<h2>{html.escape(titulo)}</h2><p class='resumo'>{linhas}</p>"
 
     maximo = max(valor for _, valor in dados) or 1
     largura_barra = min(56, (LARGURA - 40) // max(len(dados), 1))
@@ -126,6 +137,7 @@ table {{ border-collapse: collapse; width: 100%; font-size: 13px; }}
 th, td {{ border-bottom: 1px solid #eee; padding: 5px 6px; text-align: left; }}
 th {{ color: #777; font-weight: normal; font-size: 11px; }}
 .vazio {{ color: #888; font-size: 13px; }}
+.resumo {{ font-size: 14px; color: #333; margin: 6px 0 0; }}
 footer {{ margin-top: 40px; border-top: 1px solid #ddd; padding-top: 10px; color: #aaa; font-size: 12px; }}
 </style>
 </head>

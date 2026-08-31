@@ -29,6 +29,9 @@ data/livros/
 data/segredo.txt
 data/participantes.json
 data/uso.sqlite3
+# O modo WAL cria estes ao lado da base de dados, com dados por escrever
+*.sqlite3-wal
+*.sqlite3-shm
 
 # Bancos de dados locais (SQLite)
 *.db
@@ -44,3 +47,5 @@ data/verificacao.log
 
 # Instantaneos de medicao, regenerados com --guardar
 avaliacao/base*.json
+data/horario.log
+data/horario-estado.json

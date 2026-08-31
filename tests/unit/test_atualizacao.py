@@ -81,3 +81,20 @@ def test_resumo_legivel(tmp_path):
     _escrever(tmp_path / "raw" / "Fisica", "a.txt", "radiacao solar")
     alteracoes, _, _ = _correr(tmp_path)
     assert "1 novos" in alteracoes.resumo()
+
+
+def test_reindexar_limpa_as_caches_da_busca(tmp_path):
+    """As caches sao indexadas por contagem de documentos. Um ficheiro
+    alterado nao muda a contagem, e a busca ficava a servir o corpus velho."""
+    from app.search import query
+
+    _escrever(tmp_path / "raw" / "Fisica", "a.txt", "radiacao solar")
+    _correr(tmp_path)
+    query._cache_tamanhos[1] = {999: 1}
+    query._cache_vocabulario[1] = {"inventado"}
+
+    _escrever(tmp_path / "raw" / "Fisica", "a.txt", "radiacao solar e calor")
+    _correr(tmp_path)
+
+    assert query._cache_tamanhos == {}
+    assert query._cache_vocabulario == {}

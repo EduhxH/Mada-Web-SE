@@ -49,15 +49,15 @@ button { padding: 8px 16px; font-size: 15px; border: 1px solid #999; background:
 .meta { color: #666; font-size: 13px; margin-bottom: 8px; }
 .sugestao { font-size: 15px; margin: 0 0 20px; }
 .sugestao a { color: #7a2020; }
-.resultado { margin-bottom: 20px; }
+.resultado { margin-bottom: 13px; }
 .titulo { font-size: 16px; margin: 0; }
 .titulo a { color: #24418c; text-decoration: none; }
 .titulo a:hover { text-decoration: underline; }
 .pontuacao { color: #999; font-size: 12px; margin-left: 6px; }
 .disciplina { color: #555; font-size: 12px; border: 1px solid #ccc; padding: 1px 5px; margin-right: 6px; }
-.trecho { margin: 3px 0 0; font-size: 14px; line-height: 1.5; color: #333; }
+.trecho { margin: 2px 0 0; font-size: 14px; line-height: 1.45; color: #333; }
 .vazio { color: #666; }
-h2.sec { font-size: 12px; font-weight: normal; color: #666; margin: 26px 0 10px; border-bottom: 1px solid #e5e5e5; padding-bottom: 4px; text-transform: lowercase; letter-spacing: .6px; display: flex; justify-content: space-between; align-items: baseline; }
+h2.sec { font-size: 12px; font-weight: normal; color: #666; margin: 20px 0 8px; border-bottom: 1px solid #e5e5e5; padding-bottom: 4px; text-transform: lowercase; letter-spacing: .6px; display: flex; justify-content: space-between; align-items: baseline; }
 h2.sec .conta { color: #aaa; font-size: 11px; }
 h2.sec a { color: #24418c; font-size: 11px; text-decoration: none; }
 h2.sec a:hover { text-decoration: underline; }
@@ -71,7 +71,7 @@ ul.dsc { list-style: none; padding: 0; margin: 0; font-size: 14px; line-height: 
 ul.dsc a { color: #24418c; text-decoration: none; }
 ul.dsc a:hover { text-decoration: underline; }
 .vezes { color: #aaa; font-size: 11px; }
-.paginas { color: #777; font-size: 12px; margin: 4px 0 0; font-style: italic; }
+.paginas { color: #888; font-size: 12px; margin: 1px 0 0; font-style: italic; }
 .titulo .quando { color: #999; font-size: 11px; border: 1px solid #e5e5e5; padding: 1px 5px; margin-right: 6px; }
 .novo { font-size: 13px; color: #555; background: #f5f2e8; border: 1px solid #e0d8c0; padding: 6px 10px; margin: 0 0 16px; }
 .novo a { color: #24418c; }
@@ -81,7 +81,7 @@ ul.novo-lista .quando { color: #999; font-size: 12px; margin-left: 6px; }
 footer { margin-top: 48px; border-top: 1px solid #ddd; padding-top: 10px; color: #aaa; font-size: 12px; }
 footer a { color: #aaa; }
 
-.prever { display: none; font-size: 12px; color: #24418c; background: none; border: 1px solid #ccc; padding: 2px 8px; margin-top: 6px; cursor: pointer; font-family: inherit; }
+.prever { display: none; font-size: 12px; color: #24418c; background: none; border: 1px solid #ccc; padding: 2px 8px; margin-top: 4px; cursor: pointer; font-family: inherit; }
 .pv-inline:not(:empty) { border-left: 2px solid #ddd; padding: 8px 0 2px 10px; margin-top: 8px; }
 #painel { display: none; position: fixed; width: 300px; left: calc(50% + 350px); background: #fff; border: 1px solid #bbb; padding: 12px 14px; box-shadow: 0 2px 10px rgba(0,0,0,.10); max-height: 70vh; overflow-y: auto; }
 .pv-etiquetas { margin: 0 0 4px; font-size: 11px; color: #777; text-transform: lowercase; }
@@ -92,6 +92,11 @@ footer a { color: #aaa; }
 @media (max-width: 600px) {
   body { margin: 24px auto; }
   .campo, select { width: 100%; max-width: 100%; box-sizing: border-box; margin-bottom: 6px; }
+  /* No telemovel cabiam tres resultados por ecra. O trecho corta-se a duas
+     linhas: chega para reconhecer o documento, e o aluno passa a ver o
+     dobro da lista sem deslizar. */
+  .trecho { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .resultado { margin-bottom: 15px; }
 }
 @media (max-width: 1024px) {
   #painel { display: none !important; }
@@ -386,7 +391,10 @@ def _bloco_sugestao(resultado, consulta: str, disciplina: str) -> str:
     )
 
 
-def _renderizar(consulta: str, disciplina: str, resultado, seccao: str = "") -> str:
+def _renderizar(
+    consulta: str, disciplina: str, resultado, seccao: str = "",
+    mostrar_pontuacao: bool = False,
+) -> str:
     sugestao = _bloco_correcao(resultado, consulta, disciplina) + _bloco_sugestao(
         resultado, consulta, disciplina
     )
@@ -405,7 +413,7 @@ def _renderizar(consulta: str, disciplina: str, resultado, seccao: str = "") -> 
     else:
         aviso = ""
     blocos = [
-        f'<p class="meta">{len(resultado.documentos)} resultado(s){aviso}</p>',
+        f'<p class="meta">{_contagem(len(resultado.documentos))}{aviso}</p>',
         sugestao,
     ]
     paginas = {
@@ -413,7 +421,8 @@ def _renderizar(consulta: str, disciplina: str, resultado, seccao: str = "") -> 
     }
     blocos.append(
         _corpo_resultados(
-            resultado.documentos, consulta, disciplina, termos, seccao, paginas
+            resultado.documentos, consulta, disciplina, termos, seccao, paginas,
+            mostrar_pontuacao,
         )
     )
     return "\n".join(bloco for bloco in blocos if bloco)
@@ -456,23 +465,34 @@ def _outras_paginas(quantas: int) -> str:
     return f'<p class="paginas">e mais {outras} {palavra} neste documento</p>'
 
 
-def _um_resultado(doc, pontuacao, consulta, posicao, termos, paginas=1):
+def _um_resultado(
+    doc, pontuacao, consulta, posicao, termos, paginas=1,
+    mostrar_pontuacao=False, mostrar_disciplina=True,
+):
     trecho = _destacar(gerar_trecho(doc.texto, termos), termos)
     etiqueta = (
         f'<span class="disciplina">{html.escape(doc.disciplina)}</span>'
-        if doc.disciplina
+        if doc.disciplina and mostrar_disciplina
         else ""
     )
     quando = _data_legivel(getattr(doc, "data", ""))
     if quando:
         etiqueta += f'<span class="quando">{quando}</span>'
+    # A pontuacao e um numero de depuracao. Nao diz nada a um aluno e, no
+    # telemovel, empurrava metade do titulo para a linha seguinte. Fica para
+    # quem afina o ranqueamento.
+    pontos = (
+        f'<span class="pontuacao">{pontuacao:.4f}</span>'
+        if mostrar_pontuacao
+        else ""
+    )
     return (
         f'<div class="resultado" data-id="{doc.id}">'
         f'<p class="titulo">{etiqueta}'
         f'<a href="{html.escape(_ligacao(doc, consulta, posicao))}"'
         ' target="_blank" rel="noopener">'
         f"{html.escape(doc.titulo)}</a>"
-        f'<span class="pontuacao">{pontuacao:.4f}</span></p>'
+        f"{pontos}</p>"
         f'<p class="trecho">{trecho}</p>'
         f"{_outras_paginas(paginas)}"
         '<button type="button" class="prever">prever</button>'
@@ -490,8 +510,26 @@ def _url(consulta, disciplina, seccao=""):
     return "/?" + urlencode(parametros)
 
 
+def _contagem(quantos: int) -> str:
+    """"1 resultado", "32 resultados". O "(s)" e escrita de programador."""
+    if quantos == 1:
+        return "1 resultado"
+    return f"{quantos} resultados"
+
+
+def _distingue_disciplina(itens) -> bool:
+    """So vale a pena a etiqueta se as disciplinas nao forem todas iguais.
+
+    Numa busca por criterios, os cinco primeiros diziam todos "Escola": cinco
+    etiquetas a ocupar espaco sem separar nada.
+    """
+    vistas = {doc.disciplina for doc, _ in itens if doc.disciplina}
+    return len(vistas) > 1
+
+
 def _corpo_resultados(
-    documentos, consulta, disciplina, termos, seccao, paginas=None
+    documentos, consulta, disciplina, termos, seccao, paginas=None,
+    mostrar_pontuacao=False,
 ):
     # {id do documento: quantas paginas do mesmo ficheiro casaram}
     paginas = paginas or {}
@@ -517,10 +555,11 @@ def _corpo_resultados(
     grupos = mod_seccoes.agrupar(documentos)
 
     if len(grupos) <= 1:
+        mostra_disciplina = _distingue_disciplina(documentos[:LIMITE_RESULTADOS])
         partes = [
             _um_resultado(
                 doc, pontuacao, consulta, posicao, termos,
-                paginas.get(doc.id, 1),
+                paginas.get(doc.id, 1), mostrar_pontuacao, mostra_disciplina,
             )
             for posicao, (doc, pontuacao) in enumerate(
                 documentos[:LIMITE_RESULTADOS], start=1
@@ -546,12 +585,13 @@ def _corpo_resultados(
         partes.append(
             f'<h2 class="sec"><span>{html.escape(grupo.titulo)}</span>{direita}</h2>'
         )
+        mostra_disciplina = _distingue_disciplina(itens[:POR_SECCAO])
         for doc, pontuacao in itens[:POR_SECCAO]:
             posicao += 1
             partes.append(
                 _um_resultado(
                     doc, pontuacao, consulta, posicao, termos,
-                    paginas.get(doc.id, 1),
+                    paginas.get(doc.id, 1), mostrar_pontuacao, mostra_disciplina,
                 )
             )
     return "\n".join(partes)
@@ -568,39 +608,52 @@ def _montar_pagina(
             "Rode: python main.py indexar &lt;caminho&gt;</p>"
         )
     else:
-        conexao = storage.abrir(CAMINHO_BANCO)
-        disciplinas = storage.listar_disciplinas(conexao)
-        if not consulta and disciplina:
-            with uso.abrir() as registo:
-                corpo = pagina_disciplina.pagina(conexao, registo, disciplina)
-            conexao.close()
-            return _MODELO.substitute(
-                consulta="",
-                opcoes=_opcoes(disciplinas, disciplina),
-                novidades=_aviso_novidades(),
-                corpo=corpo,
-            )
-        if consulta:
-            resultado = hibrida.buscar(
-                conexao, consulta, disciplina=disciplina or None,
-                permitir_ou=not exato,
-            )
-            with uso.abrir() as registo:
-                uso.registar(
-                    registo, participante, uso.EVENTO_BUSCA,
-                    consulta=consulta,
-                    disciplina=disciplina or None,
-                    resultados=len(resultado.documentos),
-                    modo=resultado.modo,
+        # A ligacao ao indice e uma so para o processo todo, e a tranca deixa
+        # passar uma busca de cada vez. Parece o contrario do que se quer, mas
+        # foi medido: com oito alunos em simultaneo, ligacao nova por pedido
+        # dava 6.9 s e esta da 0.2 s. Ver storage.emprestada.
+        resultado = None
+        with storage.emprestada(CAMINHO_BANCO) as conexao:
+            disciplinas = storage.listar_disciplinas(conexao)
+            if not consulta and disciplina:
+                with uso.partilhada() as registo:
+                    corpo = pagina_disciplina.pagina(conexao, registo, disciplina)
+                return _MODELO.substitute(
+                    consulta="",
+                    opcoes=_opcoes(disciplinas, disciplina),
+                    novidades=_aviso_novidades(),
+                    corpo=corpo,
                 )
-                if corrigida:
+            if consulta:
+                resultado = hibrida.buscar(
+                    conexao, consulta, disciplina=disciplina or None,
+                    permitir_ou=not exato,
+                )
+                with uso.partilhada() as registo:
                     uso.registar(
-                        registo, participante, uso.EVENTO_SUGESTAO, consulta=consulta
+                        registo, participante, uso.EVENTO_BUSCA,
+                        consulta=consulta,
+                        disciplina=disciplina or None,
+                        resultados=len(resultado.documentos),
+                        modo=resultado.modo,
                     )
-            corpo = _renderizar(consulta, disciplina, resultado, seccao)
-        else:
-            corpo = ""
-        conexao.close()
+                    if corrigida:
+                        uso.registar(
+                            registo, participante, uso.EVENTO_SUGESTAO,
+                            consulta=consulta,
+                        )
+
+        # Fora da tranca: montar o HTML sao dezena de milissegundos de Python
+        # que nao tocam na base de dados, e segurar a fila com eles seria
+        # fazer os outros alunos esperar por nada.
+        corpo = (
+            _renderizar(
+                consulta, disciplina, resultado, seccao,
+                auth.e_administrador(participante),
+            )
+            if resultado is not None
+            else ""
+        )
     return _MODELO.substitute(
         consulta=html.escape(consulta, quote=True),
         opcoes=_opcoes(disciplinas, disciplina),
@@ -628,11 +681,8 @@ def _aviso_novidades() -> str:
 def _disciplinas_disponiveis() -> list[str]:
     if not CAMINHO_BANCO.exists():
         return []
-    conexao = storage.abrir(CAMINHO_BANCO)
-    try:
+    with storage.emprestada(CAMINHO_BANCO) as conexao:
         return storage.listar_disciplinas(conexao)
-    finally:
-        conexao.close()
 
 
 def _pagina_novidades() -> str:
@@ -690,7 +740,20 @@ class _Manipulador(BaseHTTPRequestHandler):
         return protecao.endereco_do_pedido(self)
 
     def _excedeu_limite(self) -> bool:
-        if _limite_geral.permitir(self._endereco()):
+        """Conta por participante quando ha sessao, por endereco quando nao ha.
+
+        A turma inteira na rede da escola sai pelo mesmo IP publico. Contar so
+        por endereco punia oito alunos a estudar como se fossem um bot: 120
+        pedidos por minuto dividem-se depressa quando cada busca leva consigo
+        sugestoes e pre-visualizacoes.
+
+        Quem ainda nao entrou continua a ser contado por endereco - antes da
+        sessao nao ha identidade nenhuma em que confiar, e e essa a porta que
+        um ataque de forca bruta bate.
+        """
+        participante = self._participante()
+        chave = f"p:{participante}" if participante else self._endereco()
+        if _limite_geral.permitir(chave):
             return False
         self.send_error(429, "demasiados pedidos")
         return True
@@ -732,7 +795,7 @@ class _Manipulador(BaseHTTPRequestHandler):
             return
         _limite_entrada.limpar(endereco)
         sessao = auth.criar_sessao(participante, auth.segredo())
-        with uso.abrir() as registo:
+        with uso.partilhada() as registo:
             uso.registar(registo, participante, uso.EVENTO_ENTRADA)
         self.send_response(303)
         self.send_header("Location", "/")
@@ -789,7 +852,7 @@ class _Manipulador(BaseHTTPRequestHandler):
             self._responder(corpo.encode("utf-8"), "text/html; charset=utf-8")
             return
         if url.path == "/estatisticas":
-            with uso.abrir() as registo:
+            with uso.partilhada() as registo:
                 corpo = estatisticas.pagina(
                     registo, auth.e_administrador(participante)
                 ).encode("utf-8")
@@ -815,25 +878,19 @@ class _Manipulador(BaseHTTPRequestHandler):
         bruto = parametros.get("id", [""])[0]
         if not bruto.isdigit() or not CAMINHO_BANCO.exists():
             return None
-        conexao = storage.abrir(CAMINHO_BANCO)
-        try:
+        with storage.emprestada(CAMINHO_BANCO) as conexao:
             documentos = storage.carregar_documentos(conexao, [int(bruto)])
-        finally:
-            conexao.close()
         return documentos.get(int(bruto))
 
     def _servir_sugestoes(self, parametros, participante: str) -> None:
         prefixo = parametros.get("q", [""])[0]
         encontradas = []
         if CAMINHO_BANCO.exists():
-            indice = storage.abrir(CAMINHO_BANCO)
-            try:
-                with uso.abrir() as registo:
+            with storage.emprestada(CAMINHO_BANCO) as indice:
+                with uso.partilhada() as registo:
                     encontradas = sugestoes.sugerir(
                         registo, indice, participante, prefixo
                     )
-            finally:
-                indice.close()
         corpo = json.dumps(
             [{"texto": s.texto, "origem": s.origem} for s in encontradas],
             ensure_ascii=False,
@@ -846,7 +903,7 @@ class _Manipulador(BaseHTTPRequestHandler):
             self.send_error(404, "documento desconhecido")
             return
         posicao = parametros.get("p", [""])[0]
-        with uso.abrir() as registo:
+        with uso.partilhada() as registo:
             uso.registar(
                 registo, participante, uso.EVENTO_ABERTURA,
                 consulta=parametros.get("q", [""])[0],
@@ -864,7 +921,7 @@ class _Manipulador(BaseHTTPRequestHandler):
             self.send_error(404, "documento desconhecido")
             return
         consulta = parametros.get("q", [""])[0]
-        with uso.abrir() as registo:
+        with uso.partilhada() as registo:
             uso.registar(
                 registo, participante, uso.EVENTO_PREVIEW,
                 consulta=consulta, doc_id=doc.id,
@@ -877,7 +934,7 @@ class _Manipulador(BaseHTTPRequestHandler):
             self.send_error(404, "documento desconhecido")
             return
         posicao = parametros.get("p", [""])[0]
-        with uso.abrir() as registo:
+        with uso.partilhada() as registo:
             uso.registar(
                 registo, participante, uso.EVENTO_ABERTURA,
                 consulta=parametros.get("q", [""])[0],

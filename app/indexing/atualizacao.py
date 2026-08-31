@@ -10,6 +10,7 @@ from pathlib import Path
 from app.crawler.local_source import Relatorio, carregar
 from app.indexing import storage
 from app.indexing.inverted_index import construir_indice
+from app.search import query
 
 CAMINHO_BANCO = Path("data") / "indice.sqlite3"
 RAIZ_CORPUS = Path("data") / "raw"
@@ -85,5 +86,11 @@ def reindexar(
         storage.salvar_indice(conexao, documentos, indice, tamanhos)
     finally:
         conexao.close()
+
+    # As caches da busca guardam vocabulario, frequencias e tamanhos por
+    # contagem de documentos. Reindexar sem contagem nova - por exemplo
+    # depois de um ficheiro ser alterado - deixava-as a servir o corpus
+    # antigo no mesmo processo.
+    query.limpar_cache()
 
     return _comparar(antes, documentos), relatorio, len(indice)

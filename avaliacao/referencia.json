@@ -1,10 +1,10 @@
 {
  "resumo": {
-  "casos": 33,
-  "mrr": 0.8359,
-  "top1": 26,
-  "top3": 28,
-  "top10": 31
+  "casos": 47,
+  "mrr": 0.849,
+  "top1": 37,
+  "top3": 42,
+  "top10": 45
  },
  "linhas": [
   {
@@ -31,22 +31,22 @@
   {
    "consulta": "inicio das aulas",
    "esperado": "Calendario-Escolar",
-   "posicao": 4,
+   "posicao": 5,
    "total": 22,
    "modo": "e"
   },
   {
    "consulta": "quando comecam as aulas",
    "esperado": "Calendario-Escolar",
-   "posicao": 0,
-   "total": 9,
-   "modo": "quorum"
+   "posicao": 27,
+   "total": 82,
+   "modo": "ou"
   },
   {
    "consulta": "regulamento interno",
    "esperado": "REGULAMENTO-INTERNO",
    "posicao": 1,
-   "total": 13,
+   "total": 15,
    "modo": "e"
   },
   {
@@ -109,7 +109,7 @@
    "consulta": "plano anual de atividades",
    "esperado": "Plano-Anual-de-Atividades",
    "posicao": 1,
-   "total": 12,
+   "total": 11,
    "modo": "e"
   },
   {
@@ -236,6 +236,104 @@
    "esperado": "82585",
    "posicao": 1,
    "total": 39,
+   "modo": "e"
+  },
+  {
+   "consulta": "horario da turma psi9",
+   "esperado": "horarios.pdf#pagina=12",
+   "posicao": 1,
+   "total": 2,
+   "modo": "e"
+  },
+  {
+   "consulta": "horario de psi9",
+   "esperado": "horarios.pdf#pagina=12",
+   "posicao": 1,
+   "total": 2,
+   "modo": "e"
+  },
+  {
+   "consulta": "horarios",
+   "esperado": "horarios.pdf",
+   "posicao": 1,
+   "total": 18,
+   "modo": "e"
+  },
+  {
+   "consulta": "trabalho para casa",
+   "esperado": "86738",
+   "posicao": 2,
+   "total": 12,
+   "modo": "e"
+  },
+  {
+   "consulta": "tpc",
+   "esperado": "86738",
+   "posicao": 2,
+   "total": 12,
+   "modo": "e"
+  },
+  {
+   "consulta": "formacao em contexto de trabalho",
+   "esperado": "ALUNOS-EM-FCT",
+   "posicao": 1,
+   "total": 57,
+   "modo": "e"
+  },
+  {
+   "consulta": "criterios de fct",
+   "esperado": "FCT",
+   "posicao": 1,
+   "total": 19,
+   "modo": "e"
+  },
+  {
+   "consulta": "colocacao de alunos em fct",
+   "esperado": "ALUNOS-EM-FCT",
+   "posicao": 1,
+   "total": 5,
+   "modo": "e"
+  },
+  {
+   "consulta": "quantas faltas posso ter",
+   "esperado": "Regime-de-assiduidade",
+   "posicao": 1,
+   "total": 13,
+   "modo": "e"
+  },
+  {
+   "consulta": "onde vejo o meu horario",
+   "esperado": "horarios.pdf",
+   "posicao": 1,
+   "total": 18,
+   "modo": "e"
+  },
+  {
+   "consulta": "quais sao os criterios de avaliacao",
+   "esperado": "Criterios-Gerais-Avaliacao",
+   "posicao": 3,
+   "total": 32,
+   "modo": "e"
+  },
+  {
+   "consulta": "como funciona o exame de recuperacao",
+   "esperado": "Regulamento-de-Recuperacao",
+   "posicao": 1,
+   "total": 5,
+   "modo": "quorum"
+  },
+  {
+   "consulta": "qual e o regulamento da escola",
+   "esperado": "REGULAMENTO-INTERNO",
+   "posicao": 1,
+   "total": 21,
+   "modo": "e"
+  },
+  {
+   "consulta": "onde estao as fichas de portugues",
+   "esperado": "82369",
+   "posicao": 1,
+   "total": 27,
    "modo": "e"
   }
  ]

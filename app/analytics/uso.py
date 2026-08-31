@@ -1,4 +1,5 @@
 import sqlite3
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -29,11 +30,57 @@ CREATE INDEX IF NOT EXISTS idx_eventos_dia ON eventos(dia);
 """
 
 
-def abrir(caminho: str | Path = CAMINHO_USO) -> sqlite3.Connection:
+def abrir(
+    caminho: str | Path = CAMINHO_USO, entre_fios: bool = False
+) -> sqlite3.Connection:
     Path(caminho).parent.mkdir(parents=True, exist_ok=True)
-    conexao = sqlite3.connect(caminho)
+    conexao = sqlite3.connect(caminho, check_same_thread=not entre_fios)
+
+    # WAL: os leitores deixam de bloquear quem escreve. Medido com o servidor
+    # a correr, registar um evento custava 322 ms - cinquenta vezes mais que a
+    # busca inteira - porque cada pedido esperava pelo bloqueio do ficheiro.
+    #
+    # synchronous=NORMAL: o WAL deixa de ser sincronizado com o disco a cada
+    # commit, so nos checkpoints. Numa falha de energia perdem-se os ultimos
+    # eventos. Isto e o registo de quantas buscas se fizeram, nao o indice nem
+    # os participantes, que vivem noutros ficheiros: e uma troca boa.
+    conexao.execute("PRAGMA journal_mode=WAL")
+    conexao.execute("PRAGMA synchronous=NORMAL")
+
     conexao.executescript(_ESQUEMA)
     return conexao
+
+
+_partilhada: sqlite3.Connection | None = None
+_tranca = threading.Lock()
+
+
+def partilhada(caminho: str | Path = CAMINHO_USO) -> sqlite3.Connection:
+    """Uma ligacao para o processo todo, nunca fechada.
+
+    Abrir e fechar por pedido custava 190 ms cada: em WAL, fechar a ultima
+    ligacao dispara um checkpoint, que reescreve o WAL no ficheiro e espera
+    pelo disco. Abrir custa 2 ms e escrever 2 ms - era o fecho que pesava,
+    e era feito a cada busca de cada aluno.
+
+    Partilhar entre fios obriga a serializar as escritas com uma tranca. A
+    escrita e de milissegundos, portanto oito alunos em simultaneo esperam
+    dezenas de milissegundos, nao segundos.
+    """
+    global _partilhada
+    with _tranca:
+        if _partilhada is None:
+            _partilhada = abrir(caminho, entre_fios=True)
+        return _partilhada
+
+
+def fechar_partilhada() -> None:
+    """Para os testes: a proxima chamada abre de novo."""
+    global _partilhada
+    with _tranca:
+        if _partilhada is not None:
+            _partilhada.close()
+            _partilhada = None
 
 
 def registar(
@@ -48,7 +95,8 @@ def registar(
     posicao: int | None = None,
 ) -> None:
     agora = datetime.now(timezone.utc)
-    with conexao:
+    # A tranca so tem efeito na ligacao partilhada; noutras e um no-op barato.
+    with _tranca, conexao:
         conexao.execute(
             "INSERT INTO eventos (momento, dia, participante, tipo, consulta,"
             " disciplina, resultados, modo, doc_id, posicao)"

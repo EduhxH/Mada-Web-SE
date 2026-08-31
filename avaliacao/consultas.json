@@ -1,5 +1,5 @@
 {
- "nota": "Conjunto de avaliacao da busca. As consultas vieram do registo de uso real (data/uso.sqlite3), nao foram inventadas. A verdade-terreno e um pedaco da ORIGEM do documento certo, e nao o seu id: as origens sobrevivem a reindexacoes, os ids do registo antigo nao sobreviveram. Consultas com nome de pessoa ficaram de fora por principio. Os casos com fonte 'disciplina' foram acrescentados em 2026-08-30 para medir a deteccao da disciplina escrita na propria pergunta, antes de essa deteccao existir. Os casos 'numero' foram acrescentados em 2026-08-30, antes de o tokenizer saber guardar digitos: a escola organiza tudo por modulo (M1, F5, P3) e por ano (10o, 12o). Em 'trabalho de ingles' o esperado e '8258', que apanha as duas pastas de Ingles: a disciplina so tem dois ficheiros e nenhum e um trabalho, mas qualquer um deles e melhor resposta do que 'Higiene e Seguranca no Trabalho', que e o que vinha antes.",
+ "nota": "Conjunto de avaliacao da busca. As consultas vieram do registo de uso real (data/uso.sqlite3), nao foram inventadas. A verdade-terreno e um pedaco da ORIGEM do documento certo, e nao o seu id: as origens sobrevivem a reindexacoes, os ids do registo antigo nao sobreviveram. Consultas com nome de pessoa ficaram de fora por principio. Os casos com fonte 'disciplina' foram acrescentados em 2026-08-30 para medir a deteccao da disciplina escrita na propria pergunta, antes de essa deteccao existir. Os casos 'numero' foram acrescentados em 2026-08-30, antes de o tokenizer saber guardar digitos: a escola organiza tudo por modulo (M1, F5, P3) e por ano (10o, 12o). Em 'trabalho de ingles' o esperado e '8258', que apanha as duas pastas de Ingles: a disciplina so tem dois ficheiros e nenhum e um trabalho, mas qualquer um deles e melhor resposta do que 'Higiene e Seguranca no Trabalho', que e o que vinha antes. Em 2026-08-30 o horario deixou de ser lacuna: passou a ser vigiado no Moodle, onde vive num URL fixo e e substituido todas as semanas. A pagina 12 do PDF e a do PSI9. Os casos 'sigla' medem o salto entre a abreviatura e o que ela quer dizer: o corpus usa as duas formas em documentos diferentes - PAP em 129 e 'prova de aptidao' em 37, FCT em 63 e 'formacao em contexto' em 86 - e quem procura uma perde a outra. Os casos 'pergunta' medem consultas escritas como perguntas, que e como os alunos escrevem. O problema e ironico: as palavras interrogativas sao RARAS no corpus - 'vejo' esta em 1 documento, 'comecam' em 2 - e o TF-IDF premeia justamente as que nao dizem nada sobre o assunto.",
  "criado": "2026-08-30",
  "casos": [
   {
@@ -166,28 +166,77 @@
    "consulta": "planificacao de ingles",
    "esperado": "82585",
    "fonte": "disciplina"
-  }
- ],
- "lacunas": [
+  },
   {
    "consulta": "horario da turma psi9",
-   "vezes": 18,
-   "motivo": "nao existe nenhum horario no corpus"
+   "esperado": "horarios.pdf#pagina=12",
+   "fonte": "registo"
+  },
+  {
+   "consulta": "horario de psi9",
+   "esperado": "horarios.pdf#pagina=12",
+   "fonte": "derivada"
   },
   {
    "consulta": "horarios",
-   "vezes": 7,
-   "motivo": "nao existe nenhum horario no corpus"
+   "esperado": "horarios.pdf",
+   "fonte": "registo"
   },
   {
-   "consulta": "horarios autocarros",
-   "vezes": 4,
-   "motivo": "nao existe nenhum horario no corpus"
+   "consulta": "trabalho para casa",
+   "esperado": "86738",
+   "fonte": "sigla"
   },
   {
    "consulta": "tpc",
-   "vezes": 6,
-   "motivo": "nenhum documento usa a sigla"
+   "esperado": "86738",
+   "fonte": "registo"
+  },
+  {
+   "consulta": "formacao em contexto de trabalho",
+   "esperado": "ALUNOS-EM-FCT",
+   "fonte": "sigla"
+  },
+  {
+   "consulta": "criterios de fct",
+   "esperado": "FCT",
+   "fonte": "sigla"
+  },
+  {
+   "consulta": "colocacao de alunos em fct",
+   "esperado": "ALUNOS-EM-FCT",
+   "fonte": "sigla"
+  },
+  {
+   "consulta": "quantas faltas posso ter",
+   "esperado": "Regime-de-assiduidade",
+   "fonte": "pergunta"
+  },
+  {
+   "consulta": "onde vejo o meu horario",
+   "esperado": "horarios.pdf",
+   "fonte": "pergunta"
+  },
+  {
+   "consulta": "quais sao os criterios de avaliacao",
+   "esperado": "Criterios-Gerais-Avaliacao",
+   "fonte": "pergunta"
+  },
+  {
+   "consulta": "como funciona o exame de recuperacao",
+   "esperado": "Regulamento-de-Recuperacao",
+   "fonte": "pergunta"
+  },
+  {
+   "consulta": "qual e o regulamento da escola",
+   "esperado": "REGULAMENTO-INTERNO",
+   "fonte": "pergunta"
+  },
+  {
+   "consulta": "onde estao as fichas de portugues",
+   "esperado": "82369",
+   "fonte": "pergunta"
   }
- ]
+ ],
+ "lacunas": []
 }
