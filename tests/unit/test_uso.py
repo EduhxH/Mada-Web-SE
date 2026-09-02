@@ -74,7 +74,9 @@ def test_pagina_de_estatisticas_gera_html(tmp_path):
     assert "estatisticas" in pagina
     assert "1" in pagina  # o cartao das buscas
     # Com um dia so nao ha grafico: uma barra sozinha nao compara nada.
-    assert "<svg" not in pagina
+    # Procura-se <rect> e nao <svg>: a pagina tem sempre SVG, que e como os
+    # icones sao desenhados; barras so as tem o grafico.
+    assert "<rect" not in pagina
 
 
 def test_grafico_aparece_quando_ha_dias_que_cheguem(tmp_path):

@@ -16,10 +16,10 @@ class Seccao:
 
 
 SECCOES = {
-    HORARIOS: Seccao(HORARIOS, "Horarios"),
+    HORARIOS: Seccao(HORARIOS, "Horários"),
     MATERIAL: Seccao(MATERIAL, "Fichas e materiais"),
-    REGULAMENTOS: Seccao(REGULAMENTOS, "Regulamentos e informacoes"),
-    SITE: Seccao(SITE, "Paginas do site"),
+    REGULAMENTOS: Seccao(REGULAMENTOS, "Regulamentos e informações"),
+    SITE: Seccao(SITE, "Páginas do site"),
 }
 
 DISCIPLINAS_HORARIO = frozenset({"horarios", "horario"})

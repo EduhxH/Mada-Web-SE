@@ -1,6 +1,7 @@
 import html
 
 from app.analytics import uso
+from app.interface import estilo, movimento
 
 LARGURA = 620
 ALTURA_BARRAS = 170
@@ -34,15 +35,15 @@ def _barras(dados: list[tuple[str, int]], titulo: str, unidade: str = "") -> str
         y = ALTURA_BARRAS - altura + 14
         partes.append(
             f'<rect x="{x}" y="{y}" width="{largura_barra - 8}" height="{altura}" '
-            f'fill="#24418c" opacity="0.78"></rect>'
+            f'fill="var(--realce)" opacity="0.85"></rect>'
         )
         partes.append(
             f'<text x="{x + (largura_barra - 8) / 2}" y="{y - 4}" '
-            f'text-anchor="middle" font-size="10" fill="#555">{valor}{unidade}</text>'
+            f'text-anchor="middle" font-size="10" fill="var(--texto-suave)">{valor}{unidade}</text>'
         )
         partes.append(
             f'<text x="{x + (largura_barra - 8) / 2}" y="{ALTURA_BARRAS + 28}" '
-            f'text-anchor="middle" font-size="9" fill="#777" '
+            f'text-anchor="middle" font-size="9" fill="var(--texto-meta)" '
             f'transform="rotate(-35 {x + (largura_barra - 8) / 2} '
             f'{ALTURA_BARRAS + 28})">{html.escape(str(rotulo)[:14])}</text>'
         )
@@ -114,37 +115,22 @@ def pagina(conexao, administrador: bool = False) -> str:
         )
     else:
         seccoes.append(
-            '<p class="vazio">Consultas feitas por uma so pessoa nao sao'
-            " mostradas, para nao identificar ninguem.</p>"
+            '<p class="vazio">Consultas feitas por uma só pessoa não são'
+            " mostradas, para não identificar ninguém.</p>"
         )
 
-    return f"""<!doctype html>
-<html lang="pt-pt">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Madalena - estatisticas</title>
-<style>
-body {{ font-family: Georgia, "Times New Roman", serif; max-width: 680px; margin: 40px auto; padding: 0 16px; color: #1a1a1a; background: #fdfdfd; }}
-h1 {{ font-size: 22px; font-weight: normal; letter-spacing: 2px; }}
-h1 a {{ color: inherit; text-decoration: none; }}
-h2 {{ font-size: 15px; font-weight: normal; color: #555; margin: 32px 0 8px; border-bottom: 1px solid #ddd; padding-bottom: 4px; }}
-.cartoes {{ display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }}
-.cartao {{ border: 1px solid #ddd; padding: 10px 14px; min-width: 96px; background: #fff; }}
-.numero {{ font-size: 22px; }}
-.rotulo {{ font-size: 11px; color: #777; margin-top: 2px; }}
-table {{ border-collapse: collapse; width: 100%; font-size: 13px; }}
-th, td {{ border-bottom: 1px solid #eee; padding: 5px 6px; text-align: left; }}
-th {{ color: #777; font-weight: normal; font-size: 11px; }}
-.vazio {{ color: #888; font-size: 13px; }}
-.resumo {{ font-size: 14px; color: #333; margin: 6px 0 0; }}
-footer {{ margin-top: 40px; border-top: 1px solid #ddd; padding-top: 10px; color: #aaa; font-size: 12px; }}
-</style>
-</head>
-<body>
-<h1><a href="/">Madalena</a> &middot; estatisticas</h1>
-{"".join(seccoes)}
-<footer>dados pseudonimizados &middot; sem nomes, sem IPs</footer>
-</body>
-</html>
-"""
+    return (
+        f"{estilo.cabeca('Madalena - estatísticas')}\n"
+        "<body>\n"
+        '<header class="topo"><div class="topo-linha">'
+        f"{estilo.marca()}"
+        f"{estilo.acoes(voltar=True)}"
+        "</div></header>\n"
+        '<main><div class="coluna">'
+        f'<h1 class="titulo-pagina">estatísticas</h1>{"".join(seccoes)}'
+        "</div></main>\n"
+        "<footer>dados pseudonimizados &middot; sem nomes, sem IPs</footer>\n"
+        f"<script>{estilo.GUIAO_BOTAO_TEMA}</script>\n"
+        f"{movimento.marcacao()}\n"
+        "</body>\n</html>"
+    )

@@ -4,7 +4,10 @@
 
 # im back
 
-<img src="assets/rei.jpg" width="180" alt="Rei Ayanami plush" />
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/marca/logo-branco.png">
+  <img src="assets/marca/logo.png" width="180" alt="Madalena Search" />
+</picture>
 
 [![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![SQLite](https://img.shields.io/badge/SQLite-003B57?style=for-the-badge&logo=sqlite&logoColor=white)](https://www.sqlite.org/)
