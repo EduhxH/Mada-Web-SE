@@ -11,6 +11,17 @@ EVENTO_PREVIEW = "preview"
 EVENTO_SUGESTAO = "sugestao_aceite"
 EVENTO_ENTRADA = "entrada"
 
+# Ao fim de quantos dias o registo de uso e apagado. O RGPD nao fixa um
+# numero, fixa o principio (art. 5.o/1/e): guarda-se o tempo necessario para
+# a finalidade e nem mais um dia. A finalidade aqui e afinar o motor contra
+# uso real, e tres meses cobrem um periodo escolar inteiro.
+DIAS_DE_RETENCAO = 90
+
+# A consulta guardada e cortada a este comprimento. Ninguem escreve uma
+# pergunta de 400 caracteres na caixa de busca - mas alguem cola la um
+# texto por engano, e nesse caso o que fica registado e o texto colado.
+LIMITE_CONSULTA = 120
+
 _ESQUEMA = """
 CREATE TABLE IF NOT EXISTS eventos (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -95,6 +106,8 @@ def registar(
     posicao: int | None = None,
 ) -> None:
     agora = datetime.now(timezone.utc)
+    if consulta is not None:
+        consulta = consulta[:LIMITE_CONSULTA]
     # A tranca so tem efeito na ligacao partilhada; noutras e um no-op barato.
     with _tranca, conexao:
         conexao.execute(
@@ -227,3 +240,39 @@ def documentos_mais_abertos(conexao: sqlite3.Connection, limite: int = 40):
         (EVENTO_ABERTURA, limite),
     ).fetchall()
 
+
+
+def apagar_antigos(conexao, dias: int = DIAS_DE_RETENCAO) -> int:
+    """Apaga os eventos mais velhos do que `dias`. Devolve quantos saíram.
+
+    Corre ao arrancar o servidor. Nao ha agendador nenhum e nao e preciso: o
+    servidor e reiniciado com frequencia, e mesmo que nao fosse, um dia a mais
+    de retencao nao e o problema - o problema era nao haver limite nenhum, que
+    era o caso ate aqui.
+    """
+    from datetime import timedelta
+
+    limite = (datetime.now(timezone.utc).date() - timedelta(days=dias)).isoformat()
+    with _tranca, conexao:
+        cursor = conexao.execute("DELETE FROM eventos WHERE dia < ?", (limite,))
+        return cursor.rowcount
+
+
+def eventos_de(conexao, participante: str) -> list[dict]:
+    """Tudo o que esta registado sobre um participante (art. 15.o do RGPD)."""
+    cursor = conexao.execute(
+        "SELECT momento, tipo, consulta, disciplina, resultados, modo, doc_id,"
+        " posicao FROM eventos WHERE participante = ? ORDER BY momento",
+        (participante,),
+    )
+    colunas = [c[0] for c in cursor.description]
+    return [dict(zip(colunas, linha)) for linha in cursor.fetchall()]
+
+
+def esquecer(conexao, participante: str) -> int:
+    """Apaga tudo o que toca a um participante (art. 17.o do RGPD)."""
+    with _tranca, conexao:
+        cursor = conexao.execute(
+            "DELETE FROM eventos WHERE participante = ?", (participante,)
+        )
+        return cursor.rowcount

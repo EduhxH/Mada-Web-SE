@@ -49,3 +49,7 @@ data/verificacao.log
 avaliacao/base*.json
 data/horario.log
 data/horario-estado.json
+
+# HTML temporario das capturas do manual: e so o passo intermedio entre o
+# servidor e o PNG, e regenera-se com scripts/capturar_ecras.py
+assets/manual/_html/

@@ -480,6 +480,57 @@ def modo_interativo() -> None:
         comando_buscar(consulta)
 
 
+def comando_dados(
+    rotulo: str, exportar: str | None, esquecer: bool, limpar_antigos: bool
+) -> None:
+    """Os direitos do RGPD pela linha de comandos.
+
+    Nao ha pagina para isto de proposito: um botao "apagar o meu historico"
+    dentro da aplicacao teria de ser protegido contra alguem apagar o de
+    outro, e a barreira de sessao sozinha nao chega para uma accao
+    irreversivel. Enquanto o piloto tiver sete pessoas, um pedido por escrito
+    e este comando resolvem o mesmo com menos superficie.
+    """
+    import json
+
+    with uso.partilhada() as registo:
+        if limpar_antigos:
+            saidos = uso.apagar_antigos(registo)
+            print(f"{saidos} eventos com mais de {uso.DIAS_DE_RETENCAO} dias apagados.")
+            return
+
+        eventos = uso.eventos_de(registo, rotulo)
+        if not eventos:
+            print(f"Nada registado para {rotulo}.")
+            if not esquecer:
+                return
+
+        if exportar:
+            destino = Path(exportar)
+            destino.write_text(
+                json.dumps(
+                    {"participante": rotulo, "eventos": eventos},
+                    ensure_ascii=False,
+                    indent=2,
+                ),
+                encoding="utf-8",
+            )
+            print(f"{len(eventos)} eventos de {rotulo} escritos em {destino}.")
+            return
+
+        if esquecer:
+            apagados = uso.esquecer(registo, rotulo)
+            print(f"{apagados} eventos de {rotulo} apagados. Nao ha volta.")
+            return
+
+        print(f"{rotulo}: {len(eventos)} eventos registados.")
+        for evento in eventos[-10:]:
+            consulta = evento["consulta"] or ""
+            print(f"  {evento['momento']}  {evento['tipo']:16s} {consulta}")
+        if len(eventos) > 10:
+            print(f"  ... e mais {len(eventos) - 10}. Use --exportar para os ver todos.")
+
+
 def main() -> None:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
@@ -515,6 +566,22 @@ def main() -> None:
         help="cria um codigo de administrador (ve as estatisticas completas)",
     )
     subcomandos.add_parser("estatisticas", help="resumo de utilizacao")
+    p_dados = subcomandos.add_parser(
+        "dados", help="ver, exportar ou apagar o registo de um participante"
+    )
+    p_dados.add_argument("rotulo", help="ex.: aluno-03")
+    p_dados.add_argument(
+        "--exportar", metavar="FICHEIRO",
+        help="escreve tudo o que esta registado num ficheiro JSON (art. 15.o)",
+    )
+    p_dados.add_argument(
+        "--esquecer", action="store_true",
+        help="apaga tudo o que toca a este participante (art. 17.o)",
+    )
+    p_dados.add_argument(
+        "--limpar-antigos", action="store_true",
+        help=f"apaga os eventos com mais de {uso.DIAS_DE_RETENCAO} dias",
+    )
     p_atual = subcomandos.add_parser(
         "atualizar", help="rastreia o site, reindexa tudo e diz o que mudou"
     )
@@ -580,6 +647,13 @@ def main() -> None:
         )
     elif argumentos.comando == "estatisticas":
         comando_estatisticas()
+    elif argumentos.comando == "dados":
+        comando_dados(
+            argumentos.rotulo,
+            argumentos.exportar,
+            argumentos.esquecer,
+            argumentos.limpar_antigos,
+        )
     elif argumentos.comando == "moodle":
         comando_moodle(
             argumentos.disciplinas,

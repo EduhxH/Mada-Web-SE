@@ -2,7 +2,7 @@
 
 <div align="center">
 
-# im back
+### v1.0 — Beta
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/marca/logo-branco.png">
@@ -16,7 +16,8 @@
 
 *A search engine built from scratch for one school — no Google, no Bing, no third-party search APIs. Real crawler, real inverted index, real TF-IDF ranking, persisted in SQLite and verified against a naive-search oracle.*
 
-[![Status](https://img.shields.io/badge/Status-In%20Development-orange?style=for-the-badge)]()
+[![Status](https://img.shields.io/badge/Status-v1.0%20Beta-2ea043?style=for-the-badge)]()
+[![Tests](https://img.shields.io/badge/Tests-458%20passing-2ea043?style=for-the-badge)]()
 
  The name **Madalena** was inspired by the name of my beloved girlfriend.
 
@@ -25,17 +26,18 @@
 
 ---
 
-> [!WARNING]
-> **This project is still under active development.**
-> It is an educational vertical search engine: it indexes a controlled collection of documents. It will never call Google, Meta or Bing search APIs — every index entry and every ranking score is computed by code in this repository.
+> [!IMPORTANT]
+> **v1.0 — feature-complete and ready for the closed beta of 15 September 2026.**
+> Every piece the beta needs is built, measured and documented: the engine, the interface, the legal documents, and a security audit. What happens next is not more building — it is watching real students use it.
 
 > [!NOTE]
-> **Scope:** Madalena is a vertical search engine for one school. Every component — crawler, tokenizer, inverted index, ranking, query processing — is implemented from scratch, and every design decision is backed by a measurement on the real corpus.
+> **Scope:** Madalena is a vertical search engine for one school. Every component — crawler, tokenizer, inverted index, ranking, query processing — is implemented from scratch, and every design decision is backed by a measurement on the real corpus. It will never call Google, Meta or Bing search APIs.
 
 ---
 
 ## Table of Contents
 
+- [Beta Release](#-beta-release--15-september-2026)
 - [About](#-about)
 - [Features](#-features)
 - [Tech Stack](#️-tech-stack)
@@ -46,6 +48,32 @@
 - [Roadmap](#-roadmap)
 - [Known Limitations](#️-known-limitations)
 - [What I Learned](#-what-i-learned)
+
+---
+
+## 🚦 Beta Release — 15 September 2026
+
+The first closed beta opens to invited students of class PSI9. This is the version they will use.
+
+| | |
+|---|---|
+| **Corpus** | 1,803 documents · 18,082 unique terms · two sources (school site + Moodle) |
+| **Search quality** | MRR **0.849** — the right document ranks first for 37 of 47 real queries, top-10 for 45 |
+| **Speed** | single-digit milliseconds per query; 20 concurrent students → 100 searches in 1.8 s |
+| **Tests** | **458** passing, including a naive-search oracle |
+| **Security** | 47 probes against the running server — 46 pass, 0 critical findings |
+| **Participants** | 7 invite codes, individually revocable |
+
+**Everything a beta needs, and nothing it does not:**
+
+- The interface is finished — its own visual identity, light and dark, phone to projector.
+- Working pagination, section tabs, keyboard-navigable suggestions, hover previews.
+- Four public documents: user manual (with screenshots), privacy policy, terms of use, and a takedown form.
+- Usage is logged pseudonymously, deleted automatically after 90 days, and exportable or erasable on request.
+- A security audit was run against the live server; the two actionable findings were fixed.
+
+**What is deliberately *not* in v1:** Teams integration, Docker, and a named domain. None of them
+block a class of seven, and each would have added surface to something already measured and working.
 
 ---
 
@@ -98,7 +126,7 @@ Zero search APIs. Every result is computed here.
 | 🔁 **Morphological Expansion** | Singular/plural variants and both sides of the 1990 orthographic reform (`adotados` ↔ `adoptados`) are added to the query — rules propose, the index vocabulary decides, so nothing is ever invented. 94 spelling pairs coexist in this corpus, school documents predating the reform and students not. A length floor keeps `apto` from collapsing into `ato`. | ✅ Done |
 | ⬆️ **Title Boost** | A hit in the title outweighs one in the body — the title says what a document *is*, the body only what it mentions. The weight was not chosen but swept from 0 to 10 against the evaluation set: the gain grows to 3.0 and plateaus, with no query regressing. Applied after ranking, at no extra I/O cost. | ✅ Done |
 | 📊 **TF-IDF Ranking** | TF = freq / doc length, IDF = log(N / df); rare terms weigh more, long documents don't win by length alone. | ✅ Done |
-| 🧪 **Oracle-verified Tests** | 437 pytest tests; the integration suite proves the index returns exactly what the naive search returns. | ✅ Done |
+| 🧪 **Oracle-verified Tests** | 458 pytest tests; the integration suite proves the index returns exactly what the naive search returns. | ✅ Done |
 | ⏱️ **Naive vs. Indexed Benchmark** | `scripts/comparar_busca.py` times both paths on the real corpus and checks they agree. | ✅ Done |
 | 💻 **CLI** | `indexar` / `buscar` subcommands plus an interactive prompt with context snippets. | ✅ Done |
 | 🖥️ **Local Web UI** | Plain, dependency-free search page (standard-library HTTP server, term highlighting): `python main.py web`. | ✅ Done |
@@ -117,6 +145,14 @@ Zero search APIs. Every result is computed here.
 | 📅 **Publication Dates** | The connector reads `Last-Modified` on every download, so "última ficha de português" can order by when material was actually published. 751 documents carry a real date; those without one sort last rather than being guessed at. | ✅ Done |
 | 📑 **One Result per File** | Page-level indexing points to the exact page but made a terrible list: 54% of top-10 slots were repeated pages of one file, and for "regulamento interno" a single PDF filled all ten. Files now appear once, by their best page, with "and 60 more pages in this document" underneath. Identical content published in several places collapses too. | ✅ Done |
 | 🔢 **Numbers Kept** | The minimum token length existed for stray letters; a stray digit means something here, where everything is organised by module. "módulo 3" used to lose the 3. Ordinals reduce to their number so "10 ano" matches "10º ano". | ✅ Done |
+| 📄 **Paginated Results** | Ten per page with a numbered bar. Section grouping became tabs, because four lists of five on one screen cannot be paginated — page 2 of that means nothing. Only page 1 counts as a search in the usage log; without that, leafing to page 5 recorded five identical searches and inflated the popularity of a single question fivefold. | ✅ Done |
+| 🎨 **Visual Identity** | A monochrome twelve-step scale and nothing else — no accent colour, so the hand-drawn cat is the only thing on the page with character. Three typefaces with separate jobs: a serif for display, a grotesque for the interface, a monospace for small uppercase labels. Fonts are self-hosted; not one request leaves the machine, not even for type. | ✅ Done |
+| 🖼️ **Sixteen Hand-drawn Icons** | Inline SVG on a shared 24-grid, 1.5 stroke. Inline rather than an icon font: no extra request to wait on, `currentColor` follows the theme without a line of CSS, and nothing is fetched from anyone else's server. | ✅ Done |
+| ✨ **Motion** | anime.js, downloaded once and served from this machine. Staggered entrances, chart bars growing from the baseline. Nothing stays hidden waiting for an animation that may never run: `requestAnimationFrame` does not fire in a hidden tab — no library escapes that — so a 1.2 s timer clears the entrance styles regardless, and a page opened in a background tab is never blank. | ✅ Done |
+| 🔊 **Interface Sounds** | Four synthesised clicks — no audio files at all, the Web Audio API builds them on the fly from a filtered noise transient over a fast-decaying sine. A pure tone sounds like an appliance; the transient is what reads as a click. Mutable, and the choice is remembered. | ✅ Done |
+| 📚 **Public Documents** | User manual with ten screenshots, privacy policy, terms of use and a takedown form — generated as branded PDFs by a hand-written generator. No PDF library: base-14 fonts need no embedding, line breaking is computed from the Helvetica width table, and the text stays selectable for copying, screen readers and search. | ✅ Done |
+| ⚖️ **RGPD Groundwork** | Search logs are pseudonymised, capped at 120 characters, auto-deleted after 90 days, and exportable or erasable per participant from the CLI. IP addresses never touch disk — they exist in memory for rate limiting and are gone. One cookie, strictly necessary, so no consent banner is owed. | ✅ Done |
+| 🔍 **Security Audit** | 47 probes against the running server: path traversal, HTML injection, SQL injection, session forgery, brute force, oversized input, slowloris. 46 pass, zero critical. The two findings — an unbounded rate-limiter dictionary that never swept, and a `Server` header naming the exact Python version — were fixed the same day. | ✅ Done |
 | 🐳 **Docker** | Containerized indexing and search. | 🔨 Planned |
 
 ---
@@ -454,7 +490,7 @@ Mada-Web-SE/
 │   ├── verificar_diario.cmd     # Scheduled Moodle check + reindex
 │   ├── vigiar_horario.cmd       # Hourly timetable watch
 │   └── pagina_publica.html      # Redirect page template
-├── tests/{unit,integration}/    # 437 tests
+├── tests/{unit,integration}/    # 458 tests
 ├── main.py                      # CLI entry point
 └── .env.example                 # Signing key and Moodle credentials
 ```
@@ -500,10 +536,16 @@ Mada-Web-SE/
 - [x] Query understanding: discipline, recency and school jargon read from the question
 - [x] Publication dates from the Moodle connector
 - [x] One result per file instead of one per page
-- [ ] Pagination — stop hydrating every result to display twenty
+- [x] Pagination — ten per page, sections became tabs
 - [x] Weekly timetable watcher — the most-searched query finally has an answer
 - [x] Question-shaped queries, abbreviations, and a class-sized load test
-- [ ] Visual design pass on the interface
+- [x] Visual design pass — monochrome identity, self-hosted type, sixteen hand-drawn icons
+- [x] Motion with anime.js, self-hosted, safe in a background tab
+- [x] Synthesised interface sounds, mutable and remembered
+- [x] Public documents: manual with screenshots, privacy policy, terms of use, takedown form
+- [x] RGPD groundwork: 90-day retention, per-participant export and erasure, corrected notice
+- [x] Security audit: 47 probes, two findings fixed
+- [x] **v1.0 — ready for the closed beta of 15 September 2026**
 - [ ] Capture the Moodle section name to tell same-named files apart
 - [ ] OR queries, exact phrases, stemming
 - [ ] Docker image and compose setup

@@ -68,6 +68,15 @@ _FORMAS = {
         'v-11A1.5 1.5 0 0 1 5.5 6h4"/>'
     ),
     "cruz": '<path d="M6 6l12 12M18 6 6 18"/>',
+    "som": (
+        '<path d="M4 9.5h3.5L12 5.5v13L7.5 14.5H4Z"/>'
+        '<path d="M16 9.2a4 4 0 0 1 0 5.6"/>'
+        '<path d="M18.5 6.5a7.5 7.5 0 0 1 0 11"/>'
+    ),
+    "sem-som": (
+        '<path d="M4 9.5h3.5L12 5.5v13L7.5 14.5H4Z"/>'
+        '<path d="M16.5 10l4 4M20.5 10l-4 4"/>'
+    ),
     "vazio": (
         '<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>'
         '<path d="M8.5 11h5"/>'
@@ -75,8 +84,36 @@ _FORMAS = {
 }
 
 
+# Marcas de terceiros. Ficam a parte dos icones de traco porque nao seguem a
+# mesma gramatica: sao silhuetas cheias, na grelha do proprio desenho, e nao
+# devem ser redesenhadas em contorno para combinar com o resto - um logotipo
+# alterado deixa de ser reconhecivel, e nao e nosso para mexer.
+_MARCAS = {
+    "github": (
+        16,
+        "M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38"
+        " 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94"
+        "-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87"
+        ".87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31"
+        "-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32"
+        "-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08"
+        " 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54"
+        " 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.012 8.012 0 0 0 16 8"
+        "c0-4.42-3.58-8-8-8Z"
+    ),
+}
+
+
 def svg(nome: str, tamanho: int = 18) -> str:
     """O icone `nome` como SVG em linha, quadrado de `tamanho` pixeis."""
+    marca = _MARCAS.get(nome)
+    if marca is not None:
+        grelha, forma = marca
+        return (
+            f'<svg class="ic" viewBox="0 0 {grelha} {grelha}" width="{tamanho}" '
+            f'height="{tamanho}" fill="currentColor" aria-hidden="true">'
+            f'<path d="{forma}"/></svg>'
+        )
     forma = _FORMAS.get(nome)
     if forma is None:
         return ""
@@ -84,8 +121,8 @@ def svg(nome: str, tamanho: int = 18) -> str:
 
 
 def existe(nome: str) -> bool:
-    return nome in _FORMAS
+    return nome in _FORMAS or nome in _MARCAS
 
 
 def nomes() -> list[str]:
-    return sorted(_FORMAS)
+    return sorted(set(_FORMAS) | set(_MARCAS))

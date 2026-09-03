@@ -36,6 +36,11 @@ CABECALHOS_SEGURANCA = {
     "Permissions-Policy": "geolocation=(), microphone=(), camera=()",
 }
 
+# So se envia quando o pedido veio mesmo por HTTPS. Mandar HSTS numa ligacao
+# local em claro faz o browser recusar "http://127.0.0.1:8081" durante um ano,
+# e o proprio desenvolvimento deixa de arrancar.
+CABECALHO_HSTS = ("Strict-Transport-Security", "max-age=15552000")
+
 _PADRAO_NOME_SEGURO = re.compile(r'[^A-Za-z0-9 ._()\[\]-]')
 
 
@@ -65,10 +70,19 @@ class Limitador:
         self.janela = janela
         self._registos: dict[str, deque] = defaultdict(deque)
         self._tranca = threading.Lock()
+        self._proxima_limpeza = time.monotonic() + janela
 
     def permitir(self, chave: str) -> bool:
         agora = time.monotonic()
         with self._tranca:
+            # Sem esta varredura o dicionario cresce uma entrada por endereco
+            # distinto e nunca encolhe: quem nao tem sessao e contado por IP,
+            # e atras do tunel chega o IP verdadeiro de cada visitante. Num
+            # servidor que fica semanas no ar isso e uma fuga de memoria lenta.
+            # Custa uma passagem pelo dicionario a cada `janela` segundos.
+            if agora >= self._proxima_limpeza:
+                self._varrer(agora)
+                self._proxima_limpeza = agora + self.janela
             marcas = self._registos[chave]
             while marcas and agora - marcas[0] > self.janela:
                 marcas.popleft()
@@ -84,6 +98,16 @@ class Limitador:
     def limpar(self, chave: str) -> None:
         with self._tranca:
             self._registos.pop(chave, None)
+
+    def _varrer(self, agora: float) -> None:
+        """Deita fora as chaves sem marcas recentes. Ja com a tranca tomada."""
+        vazios = [
+            chave
+            for chave, marcas in self._registos.items()
+            if not marcas or agora - marcas[-1] > self.janela
+        ]
+        for chave in vazios:
+            del self._registos[chave]
 
     def esquecer_antigos(self) -> None:
         agora = time.monotonic()

@@ -18,10 +18,19 @@ Quatro regras mandam nas animacoes daqui:
    uma sessao restaurada davam uma pagina em branco ate o aluno olhar para
    ela.
 
-   A defesa e o relogio de seguranca: ao fim de 1.2s os estilos da entrada
-   sao apagados, tenha a animacao corrido ou nao. O `setTimeout` continua a
-   contar em separadores escondidos - so fica mais lento - e por isso serve
-   onde o `requestAnimationFrame` nao serve.
+   Sao precisas duas defesas, e a segunda so apareceu ao tirar uma captura de
+   ecra:
+
+   - **Nao se esconde nada se a pagina ja abriu escondida.** Nesse caso o
+     guiao sai e a pagina fica como o CSS a deixou, quieta e legivel.
+   - **Se o separador perder o foco a meio, a animacao e parada e os estilos
+     limpos.** Nao basta limpar: o anime.js volta a escrever a opacidade no
+     frame seguinte e o elemento fica preso no valor onde o motor parou. Foi
+     o que aconteceu - o logotipo da entrada ficou em `opacity: 0.21` e assim
+     continuou. Quem limpa tem tambem de mandar parar.
+
+   Por cima das duas fica um `setTimeout` de 1.2s, que continua a contar em
+   separadores escondidos e serve onde o `requestAnimationFrame` nao serve.
 2. **Quem pediu menos movimento nao leva nenhum.** `prefers-reduced-motion`
    e lido a entrada e o guiao sai sem tocar em nada.
 3. **A animacao nao deixa residuo.** Ao acabar, os estilos que ela escreveu
@@ -54,26 +63,39 @@ GUIAO = """
     // fora. Sem a espera acima, isto corria antes de o anime.js carregar.
     if (parado() || typeof anime === "undefined") { return; }
 
+    // Aberta ja escondida (ctrl+clique, sessao restaurada): nao se esconde
+    // nada. O motor de animacao nao corre com o documento escondido, e uma
+    // pagina a `opacity: 0` a espera dele fica em branco.
+    if (document.hidden) { return; }
+
     var animar = anime.animate;
     var cascata = anime.stagger;
     var SAIDA = "outQuad";
+    var porLimpar = [];
 
     /* Prepara, anima, e garante que os estilos escritos aqui desaparecem -
-       ou porque a animacao acabou, ou porque o relogio disse que ja chega. */
+       porque a animacao acabou, porque o relogio disse que ja chega, ou
+       porque o separador perdeu o foco. */
     function entrada(alvos, deslocamento, duracao, passo) {
       if (!alvos || !alvos.length) { return; }
       var limpo = false;
+      var animacao = null;
       function limpar() {
         if (limpo) { return; }
         limpo = true;
+        // Parar antes de limpar. Sem isto, o anime.js volta a escrever a
+        // opacidade no frame seguinte e o elemento fica preso no valor onde
+        // o motor parou.
+        try { if (animacao) { animacao.pause(); } } catch (e) {}
         for (var i = 0; i < alvos.length; i++) {
           alvos[i].style.opacity = "";
           alvos[i].style.transform = "";
         }
       }
+      porLimpar.push(limpar);
       anime.utils.set(alvos, { opacity: 0, translateY: deslocamento });
       setTimeout(limpar, __ESPERA__);
-      animar(alvos, {
+      animacao = animar(alvos, {
         opacity: 1,
         translateY: 0,
         duration: duracao,
@@ -82,6 +104,13 @@ GUIAO = """
         onComplete: limpar,
       });
     }
+
+    // Se o aluno mudar de separador a meio da entrada, o motor para onde
+    // esta. Em vez de deixar meia pagina a meio gas, arruma-se tudo.
+    document.addEventListener("visibilitychange", function () {
+      if (!document.hidden) { return; }
+      for (var i = 0; i < porLimpar.length; i++) { porLimpar[i](); }
+    });
 
     function achar(seletor, raiz) {
       return (raiz || document).querySelectorAll(seletor);
@@ -92,20 +121,39 @@ GUIAO = """
     // segundo a acabar de chegar e via-se a lista a escrever-se.
     entrada(achar(".resultado"), 10, 380, 22);
 
-    // A entrada e a pagina de codigo: marca, lema, caixa, por esta ordem.
-    var centro = document.querySelector(".centro");
-    if (centro) {
+    // O heroi e a folha de entrada: cada peca entra por ordem de leitura.
+    // O titulo grande e o que mais se nota, por isso vem cedo e sobe mais.
+    var heroi = document.querySelector(".heroi-dentro, .entrada-caixa");
+    if (heroi) {
       entrada(
-        achar(
-          ".marca-grande, .lema, .sublema, form.busca, .cartao-entrada," +
-          " .aviso, .abaixo",
-          centro
-        ),
-        12, 420, 60
+        achar(".olho, .display, .lead, form.busca, .entrada-forma," +
+              " .experimente, .nota-final", heroi),
+        16, 460, 70
       );
     }
 
     entrada(achar(".abas .aba"), -6, 300, 28);
+    entrada(achar(".metrica"), 8, 320, 26);
+    entrada(achar(".lista-topo li"), 6, 260, 20);
+
+    // As barras do grafico crescem do chao. `scaleY` a partir da base e mais
+    // barato que animar a altura, que obrigaria a recalcular a disposicao a
+    // cada frame.
+    var barras = document.querySelectorAll(".grafico rect");
+    if (barras.length) {
+      anime.utils.set(barras, { transformOrigin: "50% 100%", scaleY: 0 });
+      animar(barras, {
+        scaleY: 1,
+        duration: 620,
+        delay: cascata(35),
+        ease: "outCubic",
+        onComplete: function () {
+          for (var i = 0; i < barras.length; i++) {
+            barras[i].style.transform = "";
+          }
+        },
+      });
+    }
 
     // O icone do tema roda meia volta ao trocar. Fica ligado ao clique e nao
     // ao estado: o estado ja e tratado no guiao do tema, e duas coisas a

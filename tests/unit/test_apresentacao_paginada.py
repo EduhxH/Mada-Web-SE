@@ -84,7 +84,7 @@ def test_aba_ativa_e_a_da_seccao_aberta():
         return
     abas = web._abas(documentos, grupos, "q", "", grupos[0][0].chave)
     assert 'class="aba ativa"' in abas
-    assert "Todos" in abas
+    assert "Tudo" in abas
 
 
 def test_tempo_usa_virgula_decimal():

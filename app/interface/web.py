@@ -11,7 +11,7 @@ from app.analytics import uso
 from app.indexing import storage
 from app.models import novidades
 from app.interface import auth, disciplina as pagina_disciplina, estatisticas, protecao
-from app.interface import estilo, icones, movimento, paginacao
+from app.interface import estilo, icones, movimento, paginacao, som
 from app.interface.preview import fragmento, resolver_origem
 from app.indexing.tokenizer import tokenizar
 import json
@@ -26,6 +26,8 @@ CAMINHO_BANCO = Path("data") / "indice.sqlite3"
 RAIZ_DADOS = (Path("data") / "raw").resolve()
 RAIZ_MARCA = (Path("assets") / "marca").resolve()
 RAIZ_JS = (Path("assets") / "js").resolve()
+RAIZ_FONTES = (Path("assets") / "fontes").resolve()
+RAIZ_DOCS = (Path("assets") / "documentos").resolve()
 # Nome do ficheiro -> (pasta, tipo). Lista fechada: o nome vem do endereco,
 # portanto vem de fora, e comparar contra uma lista e mais simples de ler - e
 # de confiar - do que tentar limpar ".." de um caminho.
@@ -34,7 +36,16 @@ _ESTATICOS = {
     "lettering.png": (RAIZ_MARCA, "image/png"),
     "icone.png": (RAIZ_MARCA, "image/png"),
     "404.png": (RAIZ_MARCA, "image/png"),
+    "gato-fundo.png": (RAIZ_MARCA, "image/png"),
     "anime.min.js": (RAIZ_JS, "application/javascript; charset=utf-8"),
+    "manrope.woff2": (RAIZ_FONTES, "font/woff2"),
+    "libre-bodoni.woff2": (RAIZ_FONTES, "font/woff2"),
+    "dm-mono-400.woff2": (RAIZ_FONTES, "font/woff2"),
+    "dm-mono-500.woff2": (RAIZ_FONTES, "font/woff2"),
+    "manual-utilizador.pdf": (RAIZ_DOCS, "application/pdf"),
+    "politica-privacidade.pdf": (RAIZ_DOCS, "application/pdf"),
+    "termos-de-uso.pdf": (RAIZ_DOCS, "application/pdf"),
+    "pedido-remocao.pdf": (RAIZ_DOCS, "application/pdf"),
 }
 # Quantos resultados por pagina. Dez e o que um buscador mostra e o que
 # torna a paginacao util: com vinte, quase nenhuma busca tinha pagina 2.
@@ -205,46 +216,60 @@ _LUPA = (
 )
 
 
-def _caixa_busca(consulta: str, opcoes: str, autofoco: bool = False) -> str:
-    """A caixa de pesquisa. A mesma no topo dos resultados e ao centro da entrada."""
+def _caixa_busca(consulta: str, opcoes: str = "", autofoco: bool = False,
+                 rotulo: str = "", disciplina: str = "") -> str:
+    """A caixa de pesquisa. A mesma no topo dos resultados e no heroi.
+
+    Com `opcoes` desenha o seletor de disciplina; sem elas, leva a disciplina
+    num campo escondido. E o que faz o cabecalho dos resultados nao repetir o
+    filtro que ja esta na coluna da esquerda - no telemovel os dois ficavam um
+    por cima do outro e pareciam avaria - sem que pesquisar de novo perca a
+    disciplina que o aluno tinha escolhido.
+    """
     foco = " autofocus" if autofoco else ""
+    marcador = rotulo or "Procurar no material da escola"
+    if opcoes:
+        filtro = (
+            f'<span class="filtro"><select name="d" aria-label="disciplina">'
+            f"{opcoes}</select></span>"
+        )
+    elif disciplina:
+        filtro = (
+            f'<input type="hidden" name="d" '
+            f'value="{html.escape(disciplina, quote=True)}">'
+        )
+    else:
+        filtro = ""
     return (
         '<form class="busca" action="/" method="get">'
         '<span class="campo">'
-        f'<span class="ic-lupa">{icones.svg("lupa", 17)}</span>'
+        f'<span class="ic-lupa">{icones.svg("lupa", 16)}</span>'
         f'<input type="text" name="q" value="{consulta}"{foco} autocomplete="off" '
-        'placeholder="procurar no material da escola">'
+        f'placeholder="{marcador}" aria-label="o que procura">'
         '<div id="sugestoes"></div></span>'
-        f'<span class="filtro"><select name="d" aria-label="disciplina">'
-        f"{opcoes}</select></span>"
-        '<button class="icone-botao solido lupa" type="submit" '
-        f'aria-label="pesquisar">{icones.svg("seta-dir", 18)}</button>'
+        f"{filtro}"
+        '<button class="botao-solido quadrado" type="submit" '
+        f'aria-label="pesquisar">{icones.svg("seta-dir", 17)}</button>'
         "</form>"
     )
 
 
 def _pagina(consulta: str, opcoes: str, novidades: str, corpo: str,
-            abas: str = "") -> str:
-    """O esqueleto das paginas com resultados."""
+            abas: str = "", pagina: str = "busca", disciplina: str = "") -> str:
+    """O esqueleto das paginas com cabecalho."""
     return (
         f"{estilo.cabeca('Madalena')}\n"
         "<body>\n"
-        '<header class="topo">'
-        '<div class="topo-linha">'
+        '<header class="topo"><div class="topo-linha">'
         f"{estilo.marca()}"
-        f"{_caixa_busca(consulta, opcoes)}"
-        f"{estilo.acoes()}"
-        "</div>"
-        f"{abas}"
-        "</header>\n"
-        '<main><div class="coluna">'
-        f"{novidades}{corpo}"
-        "</div></main>\n"
+        f"{_caixa_busca(consulta, disciplina=disciplina)}"
+        f"{estilo.acoes(pagina)}"
+        "</div></header>\n"
+        f"{corpo}\n"
+        f"{estilo.rodape()}\n"
         '<div id="painel"></div>\n'
-        '<footer>índice local &middot; sem serviços externos &middot; '
-        '<a href="/novidades">material novo</a></footer>\n'
         f"<script>{_GUIAO}{estilo.GUIAO_BOTAO_TEMA}</script>\n"
-        f"{movimento.marcacao()}\n"
+        f"{movimento.marcacao()}{som.marcacao()}\n"
         "</body>\n</html>"
     )
 
@@ -252,43 +277,59 @@ def _pagina(consulta: str, opcoes: str, novidades: str, corpo: str,
 def _pagina_entrada(erro: str = "") -> bytes:
     """A porta de entrada dos alunos que estao a testar.
 
-    Um cartao ao centro: a marca, o aviso de que isto e um teste fechado, a
-    caixa do codigo e o que fica registado. Nada mais - quem chega aqui ou tem
-    codigo ou nao tem, e nao ha nada para explorar antes disso.
+    Uma folha inteira: marca em cima, titulo grande ao centro, o campo do
+    codigo entre duas linhas, e tres marcas monoespacadas em baixo. Sem
+    cabecalho de navegacao - quem chega aqui ou tem codigo ou nao tem.
     """
-    bloco = f'<p class="erro">{html.escape(erro)}</p>' if erro else ""
+    classe = " errado" if erro else ""
+    dica = (
+        f'<p class="dica erro" aria-live="polite">{html.escape(erro)}</p>'
+        if erro
+        else '<p class="dica" aria-live="polite">O código é fornecido pelo '
+             "responsável do projeto.</p>"
+    )
     corpo = (
         f"{estilo.cabeca('Madalena - entrar')}\n"
         "<body>\n"
-        '<div class="centro cheio">'
-        f"{estilo.marca(grande=True)}"
-        '<div class="cartao-entrada">'
-        f'<span class="etiqueta-beta">{icones.svg("brilho", 13)}Teste fechado</span>'
-        '<p class="diz">Buscador do material da escola.<br>'
-        "Entra com o c\u00f3digo que te deram.</p>"
-        '<form method="post" action="/entrar">'
-        '<input class="codigo" type="text" name="codigo" '
-        'placeholder="C\u00d3DIGO-ACESSO" autofocus autocomplete="off" '
-        'aria-label="c\u00f3digo de acesso">'
-        '<button class="botao-entrar" type="submit">entrar'
+        '<div class="folha">'
+        '<div class="folha-topo">'
+        f"{estilo.marca()}"
+        '<div class="direita">'
+        '<span class="olho">acesso restrito</span>'
+        f"{som.botao()}{estilo.botao_tema()}"
+        "</div></div>\n"
+        '<div class="folha-meio"><div class="entrada-caixa">'
+        '<p class="olho">Madalena Search</p>'
+        '<h1 class="display h-gigante">Acesso ao \u00edndice.</h1>'
+        '<p class="lead">Introduz o c\u00f3digo da tua turma para pesquisar '
+        "o material escolar.</p>"
+        '<form class="entrada-forma" method="post" action="/entrar">'
+        '<label class="olho" for="codigo">C\u00f3digo de acesso</label>'
+        '<div class="entrada-linha">'
+        f'<input class="codigo{classe}" id="codigo" type="text" name="codigo" '
+        'placeholder="EX.: MADA-24" autofocus autocomplete="off">'
+        '<button class="botao-solido" type="submit">Entrar'
         f'{icones.svg("seta-dir", 16)}</button>'
+        "</div>"
+        f"{dica}"
         "</form>"
-        f"{bloco}"
-        "</div>"
-        '<div class="aviso">'
-        "Projeto em fase de teste, restrito a participantes convidados. "
-        "Para avaliar a ferramenta s\u00e3o registadas: as pesquisas feitas, se houve "
-        "resultados e que documentos foram abertos. <b>N\u00e3o</b> s\u00e3o guardados nomes, "
-        "endere\u00e7os IP nem qualquer dado pessoal &mdash; cada participante \u00e9 "
-        "identificado por um r\u00f3tulo (aluno-01, aluno-02...). "
-        "N\u00e3o partilhes o teu c\u00f3digo."
-        "</div>"
-        '<div class="abaixo">'
-        f"{estilo.botao_tema()}"
+        '<p class="nota-final">Projeto em fase de teste, restrito a '
+        "participantes convidados. Fica registado <b>o que escreves na caixa "
+        "de busca</b>, a data e o documento que abres, ligados ao teu r\u00f3tulo "
+        "(aluno-01, aluno-02...) e nao ao teu nome. O endere\u00e7o IP <b>nao</b> "
+        "\u00e9 guardado. Tudo \u00e9 apagado ao fim de 90 dias, e podes pedir para "
+        "apagar antes disso. Nao partilhes o teu c\u00f3digo. "
+        '<a href="/privacidade">Como os teus dados s\u00e3o tratados</a>.</p>'
+        "</div></div>\n"
+        '<div class="folha-rodape">'
+        "<span>\u00cdndice local</span>"
+        "<span>Sem servi\u00e7os externos</span>"
+        '<span><a href="/privacidade">Os teus dados</a></span>'
+        f"{estilo.credito()}"
         "</div>"
         "</div>\n"
         f"<script>{estilo.GUIAO_BOTAO_TEMA}</script>\n"
-        f"{movimento.marcacao()}\n"
+        f"{movimento.marcacao()}{som.marcacao()}\n"
         "</body>\n</html>"
     )
     return corpo.encode("utf-8")
@@ -376,19 +417,23 @@ def _bloco_sugestao(resultado, consulta: str, disciplina: str) -> str:
 def _renderizar(
     consulta: str, disciplina: str, resultado, seccao: str = "",
     mostrar_pontuacao: bool = False, pagina: int = 1, segundos: float = 0.0,
-) -> tuple[str, str]:
-    """Devolve (corpo, abas). As abas vivem no cabecalho, o corpo no meio."""
+    opcoes: str = "",
+) -> str:
+    """A pagina de resultados inteira: coluna de filtros a esquerda, lista a direita."""
     sugestao = _bloco_correcao(resultado, consulta, disciplina) + _bloco_sugestao(
         resultado, consulta, disciplina
     )
     if not resultado.documentos:
-        vazio = (
-            '<div class="vazio-marca">'
-            '<img src="/estatico/gato.png" alt=""></div>'
-            f'<p class="vazio">Nenhum resultado para '
-            f'<b>{html.escape(consulta)}</b>.</p>'
+        return (
+            '<div class="envolve"><div class="grelha-busca">'
+            f"{_lado(opcoes, consulta, seccao)}"
+            "<div>"
+            f"{sugestao}"
+            '<div class="nada">'
+            '<p class="display h-grande">Nada por aqui.</p>'
+            '<p class="lead">Tenta outra palavra, ou tira algum filtro.</p>'
+            "</div></div></div></div>"
         )
-        return sugestao + vazio, ""
 
     termos = set(tokenizar(consulta))
     if resultado.modo == MODO_QUORUM:
@@ -405,8 +450,6 @@ def _renderizar(
         grupo.documento.id: grupo.paginas for grupo in getattr(resultado, "grupos", [])
     }
     grupos = mod_seccoes.agrupar(resultado.documentos)
-    abas = _abas(resultado.documentos, grupos, consulta, disciplina, seccao)
-
     escolhidos = (
         mod_seccoes.filtrar(resultado.documentos, seccao)
         if seccao
@@ -414,16 +457,43 @@ def _renderizar(
     )
     janela = paginacao.calcular(len(escolhidos), pagina)
 
-    corpo = [
-        f'<p class="meta">{_contagem(len(escolhidos))}{_tempo(segundos)}{aviso}</p>',
-        sugestao,
-        _corpo_resultados(
-            escolhidos, consulta, disciplina, termos, seccao, paginas,
-            mostrar_pontuacao, janela,
-        ),
-        _barra_paginas(janela, consulta, disciplina, seccao),
-    ]
-    return "\n".join(bloco for bloco in corpo if bloco), abas
+    return (
+        '<div class="envolve"><div class="grelha-busca">'
+        f"{_lado(opcoes, consulta, seccao)}"
+        "<div>"
+        f'<p class="olho">{_contagem(len(escolhidos))} para '
+        f"&ldquo;{html.escape(consulta)}&rdquo;{_tempo(segundos)}{aviso}</p>"
+        f"{_abas(resultado.documentos, grupos, consulta, disciplina, seccao)}"
+        f"{sugestao}"
+        f"{_corpo_resultados(escolhidos, consulta, disciplina, termos, seccao, paginas, mostrar_pontuacao, janela)}"
+        f"{_barra_paginas(janela, consulta, disciplina, seccao)}"
+        "</div></div></div>"
+    )
+
+
+def _lado(opcoes: str, consulta: str = "", seccao: str = "") -> str:
+    """A coluna de filtros. No telemovel encolhe para uma linha so (ver CSS).
+
+    O `select` leva um formulario proprio a volta e nao so o `onchange`: sem
+    formulario, mudar de disciplina nao fazia nada - o controlo parecia vivo e
+    era um adorno. Com o formulario funciona tambem sem JavaScript, porque o
+    botao de reserva submete-o.
+    """
+    escondidos = f'<input type="hidden" name="q" value="{html.escape(consulta, quote=True)}">'
+    if seccao:
+        escondidos += f'<input type="hidden" name="s" value="{html.escape(seccao, quote=True)}">'
+    return (
+        '<aside class="lado">'
+        '<p class="olho">Filtrar resultados</p>'
+        '<form class="lado-bloco" action="/" method="get">'
+        f"{escondidos}"
+        '<label for="d-lado">Disciplina</label>'
+        '<select id="d-lado" name="d" onchange="this.form.submit()">'
+        f"{opcoes}</select>"
+        '<noscript><button class="botao-solido" type="submit">aplicar</button></noscript>'
+        "</form>"
+        "</aside>"
+    )
 
 
 def _abas(documentos, grupos, consulta: str, disciplina: str, seccao: str) -> str:
@@ -436,7 +506,7 @@ def _abas(documentos, grupos, consulta: str, disciplina: str, seccao: str) -> st
     """
     if len(grupos) <= 1:
         return ""
-    itens = [("", "Todos", len(documentos))]
+    itens = [("", "Tudo", len(documentos))]
     itens += [(grupo.chave, grupo.titulo, len(lista)) for grupo, lista in grupos]
     partes = []
     for chave, titulo, quantos in itens:
@@ -537,19 +607,14 @@ def _um_resultado(
 ):
     trecho = _destacar(gerar_trecho(doc.texto, termos), termos)
 
-    da_rede = doc.origem.startswith(("http://", "https://"))
-    origem = [
-        icones.svg("globo" if da_rede else "ficheiro", 14),
-        f'<span class="fonte">{html.escape(_fonte_legivel(doc.origem))}</span>',
-    ]
+    origem = [f'<span>{html.escape(_tipo_legivel(doc))}</span>']
     if doc.disciplina and mostrar_disciplina:
-        origem.append(
-            f'<span class="disciplina">{html.escape(doc.disciplina)}</span>'
-        )
+        origem.append('<span class="ponto"></span>')
+        origem.append(f"<span>{html.escape(doc.disciplina)}</span>")
     quando = _data_legivel(getattr(doc, "data", ""))
     if quando:
-        origem.append('<span class="sep">&middot;</span>')
-        origem.append(f'<span class="quando">{quando}</span>')
+        origem.append('<span class="ponto"></span>')
+        origem.append(f"<span>{quando}</span>")
 
     # A pontuacao e um numero de depuracao. Nao diz nada a um aluno e, no
     # telemovel, empurrava metade do titulo para a linha seguinte. Fica para
@@ -560,7 +625,7 @@ def _um_resultado(
         else ""
     )
     return (
-        f'<div class="resultado" data-id="{doc.id}">'
+        f'<article class="resultado" data-id="{doc.id}">'
         f'<div class="linha-origem">{"".join(origem)}</div>'
         f'<h3 class="titulo">'
         f'<a href="{html.escape(_ligacao(doc, consulta, posicao))}"'
@@ -572,8 +637,13 @@ def _um_resultado(
         '<button type="button" class="prever">'
         f'{icones.svg("olho", 14)}prever</button>'
         '<div class="pv-inline"></div>'
-        "</div>"
+        "</article>"
     )
+
+
+def _tipo_legivel(doc) -> str:
+    """A primeira etiqueta da linha de origem: que especie de documento e."""
+    return mod_seccoes.titulo_da(mod_seccoes.classificar(doc)) or "Documento"
 
 
 def _url(consulta, disciplina, seccao=""):
@@ -639,8 +709,16 @@ def _corpo_resultados(
     )
 
 
+# Tres buscas que a turma faz mesmo, tiradas do registo de uso.
+_EXEMPLOS = ("horários", "critérios de avaliação", "regulamento")
+
+
 def _pagina_inicial(opcoes: str) -> str:
-    """A entrada. Tudo o que ca esta serve para apontar para a caixa de busca."""
+    """O heroi: titulo grande, a barra, e tres buscas para experimentar."""
+    exemplos = "".join(
+        f'<a href="/?{urlencode({"q": termo})}">{html.escape(termo)}</a>'
+        for termo in _EXEMPLOS
+    )
     return (
         f"{estilo.cabeca('Madalena')}\n"
         "<body>\n"
@@ -648,21 +726,20 @@ def _pagina_inicial(opcoes: str) -> str:
         f"{estilo.marca()}"
         f"{estilo.acoes()}"
         "</div></header>\n"
-        '<div class="centro">'
-        f"{estilo.marca(grande=True)}"
-        '<h1 class="lema">Tudo da escola. Num s\u00edtio s\u00f3.</h1>'
-        '<p class="sublema">Horarios, fichas, regulamentos e paginas do site, '
-        "num indice unico.</p>"
-        f"{_caixa_busca('', opcoes, autofoco=True)}"
-        '<div class="abaixo">'
-        f'<a class="pastilha" href="/novidades">{icones.svg("brilho", 15)}'
-        "material novo</a>"
-        f'<a class="pastilha" href="/estatisticas">{icones.svg("grafico", 15)}'
-        "estatisticas</a>"
-        "</div>"
-        "</div>\n"
+        '<div class="envolve"><section class="heroi">'
+        '<div class="heroi-gato" aria-hidden="true" '
+        "style=\"background-image:url(/estatico/gato-fundo.png)\"></div>"
+        '<div class="heroi-dentro">'
+        '<p class="olho">Madalena / pesquisa escolar</p>'
+        '<h1 class="display h-gigante">Encontra o que a escola j\u00e1 sabe.</h1>'
+        '<p class="lead">Hor\u00e1rios, fichas, regulamentos e p\u00e1ginas do site '
+        "&mdash; num s\u00f3 \u00edndice, feito para chegar depressa ao que importa.</p>"
+        f"{_caixa_busca('', opcoes, autofoco=True, rotulo='O que procuras?')}"
+        f'<div class="experimente"><span>Experimenta:</span>{exemplos}</div>'
+        "</div></section></div>\n"
+        f"{estilo.rodape()}\n"
         f"<script>{_GUIAO}{estilo.GUIAO_BOTAO_TEMA}</script>\n"
-        f"{movimento.marcacao()}\n"
+        f"{movimento.marcacao()}{som.marcacao()}\n"
         "</body>\n</html>"
     )
 
@@ -673,76 +750,73 @@ def _montar_pagina(
     pagina: int = 1,
 ) -> str:
     disciplinas: list[str] = []
-    abas = ""
     if not CAMINHO_BANCO.exists():
         corpo = (
-            '<p class="vazio">Índice não encontrado. '
-            "Rode: python main.py indexar &lt;caminho&gt;</p>"
+            '<div class="envolve"><div class="nada">'
+            '<p class="display h-grande">\u00cdndice n\u00e3o encontrado.</p>'
+            '<p class="lead">Corre: python main.py indexar &lt;caminho&gt;</p>'
+            "</div></div>"
         )
-    else:
-        # A ligacao ao indice e uma so para o processo todo, e a tranca deixa
-        # passar uma busca de cada vez. Parece o contrario do que se quer, mas
-        # foi medido: com oito alunos em simultaneo, ligacao nova por pedido
-        # dava 6.9 s e esta da 0.2 s. Ver storage.emprestada.
-        resultado = None
-        segundos = 0.0
-        with storage.emprestada(CAMINHO_BANCO) as conexao:
-            disciplinas = storage.listar_disciplinas(conexao)
-            if not consulta and not disciplina:
-                return _pagina_inicial(_opcoes(disciplinas, ""))
-            if not consulta and disciplina:
-                with uso.partilhada() as registo:
-                    corpo = pagina_disciplina.pagina(conexao, registo, disciplina)
-                return _pagina(
-                    consulta="",
-                    opcoes=_opcoes(disciplinas, disciplina),
-                    novidades=_aviso_novidades(),
-                    corpo=corpo,
-                )
-            if consulta:
-                comeco = time.perf_counter()
-                resultado = hibrida.buscar(
-                    conexao, consulta, disciplina=disciplina or None,
-                    permitir_ou=not exato,
-                )
-                segundos = time.perf_counter() - comeco
-                # So a primeira pagina conta como busca. Sem isto, folhear ate
-                # a pagina 5 registava cinco buscas iguais: a mesma pergunta
-                # passava a parecer cinco vezes mais popular do que e, e o
-                # numero de buscas sem resultado ficava dividido por quantas
-                # paginas o aluno virou.
-                if pagina == 1:
-                    with uso.partilhada() as registo:
-                        uso.registar(
-                            registo, participante, uso.EVENTO_BUSCA,
-                            consulta=consulta,
-                            disciplina=disciplina or None,
-                            resultados=len(resultado.documentos),
-                            modo=resultado.modo,
-                        )
-                        if corrigida:
-                            uso.registar(
-                                registo, participante, uso.EVENTO_SUGESTAO,
-                                consulta=consulta,
-                            )
+        return _pagina("", "", "", corpo)
 
-        # Fora da tranca: montar o HTML sao dezena de milissegundos de Python
-        # que nao tocam na base de dados, e segurar a fila com eles seria
-        # fazer os outros alunos esperar por nada.
-        corpo, abas = (
-            _renderizar(
-                consulta, disciplina, resultado, seccao,
-                auth.e_administrador(participante), pagina, segundos,
+    # A ligacao ao indice e uma so para o processo todo, e a tranca deixa
+    # passar uma busca de cada vez. Parece o contrario do que se quer, mas foi
+    # medido: com oito alunos em simultaneo, ligacao nova por pedido dava
+    # 6.9 s e esta da 0.2 s. Ver storage.emprestada.
+    resultado = None
+    segundos = 0.0
+    with storage.emprestada(CAMINHO_BANCO) as conexao:
+        disciplinas = storage.listar_disciplinas(conexao)
+        if not consulta and not disciplina:
+            return _pagina_inicial(_opcoes(disciplinas, ""))
+        if not consulta and disciplina:
+            with uso.partilhada() as registo:
+                corpo = pagina_disciplina.pagina(conexao, registo, disciplina)
+            return _pagina(
+                consulta="",
+                opcoes=_opcoes(disciplinas, disciplina),
+                novidades="",
+                corpo=f'<div class="pagina-apoio">{corpo}</div>',
             )
-            if resultado is not None
-            else ("", "")
+        comeco = time.perf_counter()
+        resultado = hibrida.buscar(
+            conexao, consulta, disciplina=disciplina or None,
+            permitir_ou=not exato,
         )
+        segundos = time.perf_counter() - comeco
+        # So a primeira pagina conta como busca. Sem isto, folhear ate a
+        # pagina 5 registava cinco buscas iguais: a mesma pergunta passava a
+        # parecer cinco vezes mais popular do que e, e o numero de buscas sem
+        # resultado ficava dividido por quantas paginas o aluno virou.
+        if pagina == 1:
+            with uso.partilhada() as registo:
+                uso.registar(
+                    registo, participante, uso.EVENTO_BUSCA,
+                    consulta=consulta,
+                    disciplina=disciplina or None,
+                    resultados=len(resultado.documentos),
+                    modo=resultado.modo,
+                )
+                if corrigida:
+                    uso.registar(
+                        registo, participante, uso.EVENTO_SUGESTAO,
+                        consulta=consulta,
+                    )
+
+    # Fora da tranca: montar o HTML sao dezena de milissegundos de Python que
+    # nao tocam na base de dados, e segurar a fila com eles seria fazer os
+    # outros alunos esperar por nada.
+    opcoes = _opcoes(disciplinas, disciplina)
+    corpo = _renderizar(
+        consulta, disciplina, resultado, seccao,
+        auth.e_administrador(participante), pagina, segundos, opcoes,
+    )
     return _pagina(
         consulta=html.escape(consulta, quote=True),
-        opcoes=_opcoes(disciplinas, disciplina),
-        novidades=_aviso_novidades(),
+        opcoes=opcoes,
+        novidades="",
         corpo=corpo,
-        abas=abas,
+        disciplina=disciplina,
     )
 
 
@@ -770,27 +844,113 @@ def _disciplinas_disponiveis() -> list[str]:
         return storage.listar_disciplinas(conexao)
 
 
+# Os mesmos dois enderecos dos PDFs. O escolar vem primeiro: e institucional,
+# e ninguem devia ter de escrever para um endereco pessoal para exercer um
+# direito. Vivem aqui e em `scripts/gerar_documentos.py` - se mudarem, mudam
+# nos dois sitios, e o script tem de correr outra vez.
+CONTACTO_ESCOLAR = "a2025016@alunos.sefo.pt"
+CONTACTO_PESSOAL = "eduardo.carvalho.pt.dev@gmail.com"
+
+_DOCUMENTOS = (
+    (
+        "manual-utilizador.pdf",
+        "Manual do utilizador",
+        "Como procurar, como ler os resultados e como escrever melhor a "
+        "pergunta. Com imagens de cada ecrã.",
+    ),
+    (
+        "termos-de-uso.pdf",
+        "Termos de uso",
+        "O que é o Madalena, quem pode usá-lo, e o que não é garantido "
+        "— disponibilidade, completude e atualidade.",
+    ),
+    (
+        "politica-privacidade.pdf",
+        "Política de Privacidade e Cookies",
+        "O que fica registado quando pesquisas, porque fica, durante quanto "
+        "tempo, e como pedir para apagar.",
+    ),
+    (
+        "pedido-remocao.pdf",
+        "Pedido de remoção do índice",
+        "Para pedir que um documento deixe de aparecer nas pesquisas: dados "
+        "pessoais, ficheiros internos ou direitos de autor.",
+    ),
+)
+
+
+def _pagina_privacidade() -> str:
+    """A pagina publica dos documentos.
+
+    Vive fora da barreira de sessao. Quem precisa de saber o que e registado
+    costuma ser exactamente quem ainda nao entrou - um encarregado de educacao
+    a decidir se autoriza o filho a participar nao tem codigo nenhum.
+    """
+    linhas = []
+    for ficheiro, titulo, descricao in _DOCUMENTOS:
+        linhas.append(
+            f'<li><a href="/estatico/{ficheiro}" target="_blank" rel="noopener">'
+            f'{icones.svg("ficheiro", 15)}{html.escape(titulo)}</a>'
+            f'<span class="quando">PDF</span>'
+            f'<p class="doc-diz">{html.escape(descricao)}</p></li>'
+        )
+    return (
+        '<div class="pagina-apoio">'
+        f'<a class="voltar" href="/">{icones.svg("seta-esq", 14)}voltar \u00e0 busca</a>'
+        '<p class="olho">Transpar\u00eancia</p>'
+        '<h1 class="display h-grande">Os teus dados</h1>'
+        '<div class="bloco-linhas">'
+        '<p class="grande">Fica registado o que escreves na caixa de busca, a data, '
+        "e o documento que abres.</p>"
+        '<p class="pequena">Ligado ao teu r\u00f3tulo (aluno-01, aluno-02...) e n\u00e3o ao '
+        "teu nome. O endere\u00e7o IP <b>n\u00e3o</b> \u00e9 guardado. Tudo \u00e9 apagado ao fim de "
+        "90 dias.</p>"
+        "</div>"
+        f'<ul class="novo-lista lista-docs">{"".join(linhas)}</ul>'
+        '<div class="bloco-linhas">'
+        '<p class="grande">Queres ver, apagar ou opores-te ao registo?</p>'
+        '<p class="pequena">Escreve para '
+        f'<a href="mailto:{CONTACTO_ESCOLAR}">{CONTACTO_ESCOLAR}</a> ou '
+        f'<a href="mailto:{CONTACTO_PESSOAL}">{CONTACTO_PESSOAL}</a>. '
+        "N\u00e3o precisas de justificar, e a resposta chega em menos de 30 dias.</p>"
+        "</div>"
+        '<p class="lado-nota">Estes documentos descrevem um piloto escolar fechado. '
+        "Se alguma coisa neles n\u00e3o corresponder ao que o sistema faz, o erro "
+        "\u00e9 do documento e deve ser comunicado.</p>"
+        "</div>"
+    )
+
+
 def _pagina_novidades() -> str:
     recentes = novidades.recentes()
     if not recentes:
-        corpo = '<p class="vazio">Nada de novo nos últimos dias.</p>'
+        bloco = (
+            '<div class="bloco-linhas">'
+            '<p class="grande">Ainda n\u00e3o chegou material novo nos \u00faltimos dias.</p>'
+            '<p class="pequena">Quando chegar, aparece aqui.</p>'
+            "</div>"
+        )
     else:
         linhas = []
         for item in recentes:
             titulo = html.escape(item.titulo)
             disciplina = html.escape(item.disciplina)
-            # Leva a busca ca dentro, nao ao Moodle: o url guardado e
-            # relativo ao Moodle e resolveria contra o servidor errado.
+            # Leva a busca ca dentro, nao ao Moodle: o url guardado e relativo
+            # ao Moodle e resolveria contra o servidor errado.
             procura = urlencode({"q": item.titulo})
             linhas.append(
                 f'<li><span class="disciplina">{disciplina}</span>'
                 f'<a href="/?{procura}">{titulo}</a>'
                 f'<span class="quando">{html.escape(item.data)}</span></li>'
             )
-        corpo = f'<ul class="novo-lista">{"".join(linhas)}</ul>'
+        bloco = f'<ul class="novo-lista">{"".join(linhas)}</ul>'
     return (
-        f'<h2 class="sec">material novo</h2>{corpo}'
-        '<p class="voltar"><a href="/">voltar à busca</a></p>'
+        '<div class="pagina-apoio">'
+        f'<a class="voltar" href="/">{icones.svg("seta-esq", 14)}voltar \u00e0 busca</a>'
+        '<p class="olho">\u00cdndice local</p>'
+        '<h1 class="display h-grande">Material novo</h1>'
+        f"{bloco}"
+        "</div>"
     )
 
 
@@ -814,6 +974,11 @@ class _Manipulador(BaseHTTPRequestHandler):
     # Uma ligacao que nunca acaba de enviar prende uma thread para sempre.
     timeout = 20
     protocol_version = "HTTP/1.1"
+    # Por omissao o cabecalho Server dizia "BaseHTTP/0.6 Python/3.11.15". A
+    # versao exata do interpretador e meio caminho andado para quem procura
+    # uma falha conhecida: nao ha razao para a oferecer.
+    server_version = "Madalena"
+    sys_version = ""
 
     def handle_one_request(self):
         try:
@@ -899,6 +1064,35 @@ class _Manipulador(BaseHTTPRequestHandler):
         url = urlparse(self.path)
         parametros = parse_qs(url.query)
 
+        if url.path == "/privacidade":
+            corpo = _pagina(
+                consulta="",
+                opcoes="",
+                novidades="",
+                corpo=_pagina_privacidade(),
+                pagina="privacidade",
+            )
+            self._responder(corpo.encode("utf-8"), "text/html; charset=utf-8")
+            return
+
+        if url.path == "/robots.txt":
+            # Nada aqui e para indexar: o motor e fechado por codigo e as
+            # paginas de apoio nao interessam a robo nenhum. Fica declarado
+            # ainda assim, porque um 403 nao diz a intencao.
+            self._responder(
+                b"User-agent: *\nDisallow: /\n", "text/plain; charset=utf-8"
+            )
+            return
+
+        if url.path.startswith("/estatico/"):
+            # Antes da barreira de sessao, e de proposito. Sao imagens da
+            # marca, tipos de letra, a biblioteca de animacoes e os documentos
+            # publicos - nada disto e sensivel, e a propria pagina de entrada
+            # precisa deles. Enquanto estiveram atras da sessao, quem chegava
+            # de fora via a pagina de entrada sem logotipo e sem tipos de letra.
+            self._servir_estatico(url.path)
+            return
+
         if url.path == "/sair":
             self.send_response(303)
             self.send_header("Location", "/")
@@ -915,9 +1109,6 @@ class _Manipulador(BaseHTTPRequestHandler):
                 self.send_error(403, "acesso restrito")
             return
 
-        if url.path.startswith("/estatico/"):
-            self._servir_estatico(url.path)
-            return
         if url.path == "/sugerir":
             self._servir_sugestoes(parametros, participante)
             return
@@ -936,6 +1127,7 @@ class _Manipulador(BaseHTTPRequestHandler):
                 opcoes=_opcoes(_disciplinas_disponiveis(), ""),
                 novidades="",
                 corpo=_pagina_novidades(),
+                pagina="novidades",
             )
             self._responder(corpo.encode("utf-8"), "text/html; charset=utf-8")
             return
@@ -1066,6 +1258,8 @@ class _Manipulador(BaseHTTPRequestHandler):
             self.send_header("Cache-Control", "public, max-age=86400")
         for chave, valor in protecao.CABECALHOS_SEGURANCA.items():
             self.send_header(chave, valor)
+        if protecao.veio_por_tunel(self):
+            self.send_header(*protecao.CABECALHO_HSTS)
         if nome:
             seguro = protecao.sanear_nome_ficheiro(nome)
             self.send_header(
@@ -1079,6 +1273,18 @@ class _Manipulador(BaseHTTPRequestHandler):
 
 
 def iniciar(porta: int = 8080, host: str = "127.0.0.1") -> None:
+    # Apagar o que passou do prazo e a primeira coisa que se faz, antes de
+    # aceitar um pedido. Nao ha agendador: o servidor e reiniciado com
+    # frequencia e isso chega. O que nao chegava era nao haver prazo nenhum.
+    try:
+        with uso.partilhada() as registo:
+            saidos = uso.apagar_antigos(registo)
+        if saidos:
+            print(f"Registo: {saidos} eventos com mais de "
+                  f"{uso.DIAS_DE_RETENCAO} dias apagados.")
+    except Exception as erro:
+        print(f"AVISO: nao foi possivel limpar o registo de uso ({erro}).")
+
     if not auth.carregar_participantes():
         print("AVISO: nenhum participante criado ainda.")
         print("       python main.py participantes --criar 8")
