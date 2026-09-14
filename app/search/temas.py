@@ -155,16 +155,19 @@ def _lift(df_disc: int, n_disc: int, df_total: int, total: int) -> float:
     return taxa_disc / taxa_resto
 
 
-_cache_espalhamento: dict[int, dict[str, int]] = {}
+# Mesma razao que em `query`: a chave e a versao do indice, para uma
+# reindexacao feita por fora nao passar despercebida.
+_cache_espalhamento: dict[tuple, dict[str, int]] = {}
 
 
-def _espalhamento(conexao_indice, total_docs: int) -> tuple[dict[str, int], int]:
-    if total_docs not in _cache_espalhamento:
+def _espalhamento(conexao_indice) -> tuple[dict[str, int], int]:
+    versao = storage.versao_do_indice(conexao_indice)
+    if versao not in _cache_espalhamento:
         _cache_espalhamento.clear()
-        _cache_espalhamento[total_docs] = storage.disciplinas_por_termo(
+        _cache_espalhamento[versao] = storage.disciplinas_por_termo(
             conexao_indice
         )
-    return _cache_espalhamento[total_docs], storage.contar_disciplinas(conexao_indice)
+    return _cache_espalhamento[versao], storage.contar_disciplinas(conexao_indice)
 
 
 def limpar_cache() -> None:
@@ -199,7 +202,7 @@ def extrair(
     proprios = set(tokenizar(disciplina, remover_stop_words=False))
     proprios |= {remover_acentos(disciplina.lower())}
 
-    espalhamento, n_disciplinas = _espalhamento(conexao_indice, total)
+    espalhamento, n_disciplinas = _espalhamento(conexao_indice)
     vocabulario = set(espalhamento)
     teto_espalhamento = max(1, int(n_disciplinas * ESPALHAMENTO_MAXIMO))
 

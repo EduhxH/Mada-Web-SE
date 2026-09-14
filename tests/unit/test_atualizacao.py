@@ -98,3 +98,47 @@ def test_reindexar_limpa_as_caches_da_busca(tmp_path):
 
     assert query._cache_tamanhos == {}
     assert query._cache_vocabulario == {}
+
+
+def test_cache_de_busca_nota_reindexacao_de_outro_processo(tmp_path):
+    """O caso real: a tarefa agendada reindexa enquanto o servidor serve.
+
+    A chave da cache era a contagem de documentos. Substituir um documento por
+    outra versao - um professor que corrige um PDF com o mesmo numero de
+    paginas - deixava a contagem igual, e o servidor continuava a pesar os
+    documentos novos com os tamanhos e as frequencias dos antigos.
+    """
+    from app.indexing import storage
+    from app.indexing.inverted_index import construir_indice
+    from app.models.document import Documento
+    from app.search import query
+
+    banco = tmp_path / "indice.sqlite3"
+
+    def gravar(textos):
+        documentos = [
+            Documento(i, f"Doc {i}", texto, "teste")
+            for i, texto in enumerate(textos, start=1)
+        ]
+        indice, tamanhos = construir_indice(documentos)
+        conexao = storage.abrir(banco)
+        storage.salvar_indice(conexao, documentos, indice, tamanhos)
+        conexao.close()
+
+    gravar(["alfa beta", "gama delta"])
+    query.limpar_cache()
+
+    # O "servidor": uma ligacao aberta que fica a servir.
+    servidor = storage.abrir(banco)
+    assert "alfa" in query._vocabulario(servidor)
+    assert "epsilon" not in query._vocabulario(servidor)
+
+    # A "tarefa agendada": outro processo reescreve, com a MESMA contagem.
+    gravar(["epsilon zeta", "gama delta"])
+
+    assert "epsilon" in query._vocabulario(servidor), (
+        "o servidor continuou a servir o vocabulario antigo"
+    )
+    assert "alfa" not in query._vocabulario(servidor)
+    servidor.close()
+    query.limpar_cache()

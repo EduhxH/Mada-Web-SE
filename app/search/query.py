@@ -64,9 +64,13 @@ class ResultadoBusca:
         return " ".join(palavras)
 
 
-_cache_vocabulario: dict[int, set[str]] = {}
-_cache_frequencias: dict[int, dict[str, int]] = {}
-_cache_tamanhos: dict[int, dict[int, int]] = {}
+# Chave: a versao do indice (ver `storage.versao_do_indice`), e nao so a
+# contagem de documentos. Um reindexar feito por uma tarefa agendada enquanto o
+# servidor esta a servir tem de invalidar isto, e pode acontecer sem a contagem
+# mudar.
+_cache_vocabulario: dict[tuple, set[str]] = {}
+_cache_frequencias: dict[tuple, dict[str, int]] = {}
+_cache_tamanhos: dict[tuple, dict[int, int]] = {}
 
 
 def _tamanhos(conexao) -> dict[int, int]:
@@ -77,30 +81,30 @@ def _tamanhos(conexao) -> dict[int, int]:
     simultaneo era o que dominava, e a mediana por busca subia de 20 ms para
     quase meio segundo.
     """
-    total = storage.contar_documentos(conexao)
-    if total not in _cache_tamanhos:
+    versao = storage.versao_do_indice(conexao)
+    if versao not in _cache_tamanhos:
         _cache_tamanhos.clear()
-        _cache_tamanhos[total] = storage.carregar_tamanhos(conexao)
-    return _cache_tamanhos[total]
+        _cache_tamanhos[versao] = storage.carregar_tamanhos(conexao)
+    return _cache_tamanhos[versao]
 
 
 def _frequencias(conexao) -> dict[str, int]:
     """{termo: em quantos documentos aparece} - o teto dos sinonimos usa isto."""
-    total = storage.contar_documentos(conexao)
-    if total not in _cache_frequencias:
+    versao = storage.versao_do_indice(conexao)
+    if versao not in _cache_frequencias:
         _cache_frequencias.clear()
-        _cache_frequencias[total] = dict(storage.listar_vocabulario(conexao))
-    return _cache_frequencias[total]
+        _cache_frequencias[versao] = dict(storage.listar_vocabulario(conexao))
+    return _cache_frequencias[versao]
 
 
 def _vocabulario(conexao) -> set[str]:
-    total = storage.contar_documentos(conexao)
-    if total not in _cache_vocabulario:
+    versao = storage.versao_do_indice(conexao)
+    if versao not in _cache_vocabulario:
         _cache_vocabulario.clear()
-        _cache_vocabulario[total] = {
+        _cache_vocabulario[versao] = {
             termo for termo, _ in storage.listar_vocabulario(conexao)
         }
-    return _cache_vocabulario[total]
+    return _cache_vocabulario[versao]
 
 
 def limpar_cache() -> None:

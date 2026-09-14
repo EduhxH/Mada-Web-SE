@@ -17,7 +17,7 @@
 *A search engine built from scratch for one school — no Google, no Bing, no third-party search APIs. Real crawler, real inverted index, real TF-IDF ranking, persisted in SQLite and verified against a naive-search oracle.*
 
 [![Status](https://img.shields.io/badge/Status-v1.0%20Beta-2ea043?style=for-the-badge)]()
-[![Tests](https://img.shields.io/badge/Tests-686%20passing-2ea043?style=for-the-badge)]()
+[![Tests](https://img.shields.io/badge/Tests-698%20passing-2ea043?style=for-the-badge)]()
 
  The name **Madalena** was inspired by the name of my beloved girlfriend.
 
@@ -57,10 +57,10 @@ The first closed beta opens to invited students of class PSI9. This is the versi
 
 | | |
 |---|---|
-| **Corpus** | 1,803 documents · 18,082 unique terms · two sources (school site + Moodle) |
+| **Corpus** | 1,822 documents · 18,154 unique terms · two sources (school site + Moodle) |
 | **Search quality** | MRR **0.849** — the right document ranks first for 37 of 47 real queries, top-10 for 45 |
 | **Speed** | single-digit milliseconds per query; 20 concurrent students → 100 searches in 1.8 s |
-| **Tests** | **686** passing, including a naive-search oracle |
+| **Tests** | **698** passing, including a naive-search oracle |
 | **Security** | 101 probes against the running server — 47 from September's audit, 54 against the admin panel |
 | **Participants** | 8 codes — 7 students and one administrator — individually revocable, each with its own session epoch |
 
@@ -87,7 +87,7 @@ It crawls the school website (respecting `robots.txt`, rate limits and depth), i
 
 Queries are answered with graceful relaxation — all terms, then a quorum, then any — ranked by TF-IDF with a title boost, expanded across singular/plural variants, and grouped into sections so results stay legible.
 
-**Current corpus: 1,803 documents, 18,082 unique terms** — 1,010 pages and PDFs crawled from the school site plus 751 documents synced from Moodle across 10 course subjects. Queries run in single-digit milliseconds.
+**Current corpus: 1,822 documents, 18,154 unique terms** — 1,027 pages and PDFs crawled from the school site plus 751 documents synced from Moodle across 10 course subjects, and the weekly timetable. Queries run in single-digit milliseconds.
 
 The engine is a **catalogue, not a repository**: results link back to where the document actually lives. Nothing is republished, and no personal data is ever indexed.
 
@@ -129,7 +129,7 @@ Zero search APIs. Every result is computed here.
 | ⬆️ **Title Boost** | A hit in the title outweighs one in the body — the title says what a document *is*, the body only what it mentions. The weight was not chosen but swept from 0 to 10 against the evaluation set: the gain grows to 3.0 and plateaus, with no query regressing. Applied after ranking, at no extra I/O cost. | ✅ Done |
 | 📊 **TF-IDF Ranking** | TF = freq / doc length, IDF = log(N / df); rare terms weigh more, long documents don't win by length alone. | ✅ Done |
 | 🛠️ **Admin Panel** | Six sections behind an `admin-` code: usage, user management with live presence and device, a **live server log**, one-click Moodle checks, a newsletter editor, and a profile photo. The newsletter's markup never becomes HTML — everything is escaped before any rule is applied, and images may only come from this machine. | ✅ Done |
-| 🧪 **Oracle-verified Tests** | 686 pytest tests; the integration suite proves the index returns exactly what the naive search returns. | ✅ Done |
+| 🧪 **Oracle-verified Tests** | 698 pytest tests; the integration suite proves the index returns exactly what the naive search returns. | ✅ Done |
 | ⏱️ **Naive vs. Indexed Benchmark** | `scripts/comparar_busca.py` times both paths on the real corpus and checks they agree. | ✅ Done |
 | 💻 **CLI** | `indexar` / `buscar` subcommands plus an interactive prompt with context snippets. | ✅ Done |
 | 🖥️ **Local Web UI** | Plain, dependency-free search page (standard-library HTTP server, term highlighting): `python main.py web`. | ✅ Done |
@@ -521,7 +521,32 @@ minute per participant. Three separate pollers spent half of that before the
 admin clicked anything; each page now says what it wants and fetches it in one
 call.
 
-**13. Tests, benchmark and usage stats**
+**13. Check the index still matches reality**
+
+```bash
+.venv\Scripts\python scripts\varrer_frescura.py --so-ancoradas
+```
+
+The worst failure this index can have is not a missing document — it is a
+document that still looks right. The school's timetable lives at a fixed URL and
+is replaced weekly; the index held July's copy, in which class PSI9 sat on pages
+11 and 12. Search answered "page 11", the link opened the **live** PDF at page
+11, and in the current file that page is a different class. Title right, snippet
+right, wrong page. A dead link gives an error everyone understands; this one
+lies quietly.
+
+So this sweep asks, one HEAD request per address: has the source changed since
+we captured it? Files that changed **and** carry a `#pagina=` anchor come first,
+because those are the ones whose page numbers drift.
+
+It reports `não verificável` separately from a problem. Roughly 326 of the
+addresses are pages generated on the fly — the school's WordPress, Moodle folder
+views — and they send neither `Last-Modified` nor `Content-Length`, so there is
+nothing to compare. That is the tool's reach, not a defect, and folding the two
+into one number would make a clean index look broken. The static files, which
+are exactly the page-anchored ones, all answer properly.
+
+**14. Tests, benchmark and usage stats**
 
 ```bash
 .venv\Scripts\python -m pytest
@@ -605,9 +630,10 @@ Mada-Web-SE/
 │   ├── publicar_tunel.py        # Tunnel + stable redirect page
 │   ├── tarefa.py                # One scheduled step: check, reindex if needed
 │   ├── no_ar.py                 # Keeps server, tunnel and machine up
+│   ├── varrer_frescura.py       # Has any indexed source changed underneath us?
 │   ├── agendar.ps1              # Registers the four scheduled tasks
 │   └── pagina_publica.html      # Redirect page template
-├── tests/{unit,integration}/    # 686 tests
+├── tests/{unit,integration}/    # 698 tests
 ├── main.py                      # CLI entry point
 └── .env.example                 # Signing key and Moodle credentials
 ```
@@ -664,6 +690,7 @@ Mada-Web-SE/
 - [x] Security audit: 47 probes, two findings fixed
 - [x] Scheduled upkeep: three Moodle checks a day, reindex only when something is new
 - [x] Admin panel: presence, live log, manual runs, newsletter — statistics closed to students
+- [x] Freshness sweep: catch indexed documents whose source changed underneath them
 - [x] **v1.0 — ready for the closed beta of 15 September 2026**
 - [ ] Capture the Moodle section name to tell same-named files apart
 - [ ] OR queries, exact phrases, stemming

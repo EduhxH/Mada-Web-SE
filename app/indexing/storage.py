@@ -157,6 +157,24 @@ def carregar_tamanhos(conexao: sqlite3.Connection) -> dict[int, int]:
     return dict(linhas)
 
 
+def versao_do_indice(conexao: sqlite3.Connection) -> tuple[int, int]:
+    """Um par que muda sempre que o indice muda, para servir de chave de cache.
+
+    A contagem de documentos sozinha nao chega. As tarefas agendadas reindexam
+    num processo a parte enquanto o servidor serve, e uma reindexacao em que a
+    contagem fique igual - um professor substitui um PDF pela versao corrigida,
+    mesmo numero de paginas - nao mudava a chave. As caches continuavam a servir
+    os tamanhos e as frequencias do corpus antigo, e o TF-IDF passava a pesar
+    documentos novos com numeros velhos.
+
+    `PRAGMA data_version` e a peca que faltava: o SQLite incrementa-o nesta
+    ligacao sempre que **outra** ligacao escreve no ficheiro. E exactamente a
+    pergunta "alguem mexeu nisto por fora?", respondida sem tocar no disco.
+    """
+    marca = conexao.execute("PRAGMA data_version").fetchone()[0]
+    return contar_documentos(conexao), marca
+
+
 def contar_documentos(conexao: sqlite3.Connection) -> int:
     return conexao.execute("SELECT COUNT(*) FROM documents").fetchone()[0]
 
