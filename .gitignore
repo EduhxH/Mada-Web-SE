@@ -43,7 +43,26 @@ data/uso.sqlite3
 
 # Registo de material novo do Moodle: estado local, nao versionado
 data/novidades.json
+# Posts da newsletter, media carregada e fotos de perfil: conteudo e dados de
+# pessoas desta escola, nao pertencem ao repositorio publico
+data/newsletter.json
+data/newsletter.json.novo
+data/media/
+data/perfil/
+# Marcas de "ja vi esta secao do painel": preferencia de interface, nao dado
+data/painel-visto.json
+# Epocas de sessao: estado local de quem foi expulso e quando
+data/sessoes-cortadas.json
+# Registo do servidor (so avisos e erros; o resto vive em memoria)
+data/servidor.log
 data/verificacao.log
+# Registos rodados pelas tarefas agendadas (scripts/tarefa.py)
+*.log.1
+
+# Os codigos de acesso em claro. Sao a unica copia - no servidor so existe o
+# HMAC - por isso ficam em ficheiro para nao se perderem ao fechar a consola,
+# e apagam-se depois de entregues.
+data/codigos-*.txt
 
 # Instantaneos de medicao, regenerados com --guardar
 avaliacao/base*.json

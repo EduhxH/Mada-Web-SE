@@ -9,9 +9,11 @@ from urllib.parse import parse_qs, urlencode, urlparse
 
 from app.analytics import uso
 from app.indexing import storage
-from app.models import novidades
+from app.models import newsletter, novidades
 from app.interface import auth, disciplina as pagina_disciplina, estatisticas, protecao
 from app.interface import estilo, icones, movimento, paginacao, som
+from app.interface import marcacao, media, operacoes, painel, presenca
+from app.interface import registo as registo_servidor
 from app.interface.preview import fragmento, resolver_origem
 from app.indexing.tokenizer import tokenizar
 import json
@@ -255,15 +257,21 @@ def _caixa_busca(consulta: str, opcoes: str = "", autofoco: bool = False,
 
 
 def _pagina(consulta: str, opcoes: str, novidades: str, corpo: str,
-            abas: str = "", pagina: str = "busca", disciplina: str = "") -> str:
-    """O esqueleto das paginas com cabecalho."""
+            abas: str = "", pagina: str = "busca", disciplina: str = "",
+            administrador: bool = False) -> str:
+    """O esqueleto das paginas com cabecalho.
+
+    `administrador` decide se o cabecalho mostra a entrada para o painel.
+    Mostrar um botao que devolve 403 ensinava o aluno a bater numa porta
+    fechada, e fazia a interface parecer avariada estando a funcionar bem.
+    """
     return (
         f"{estilo.cabeca('Madalena')}\n"
         "<body>\n"
         '<header class="topo"><div class="topo-linha">'
         f"{estilo.marca()}"
         f"{_caixa_busca(consulta, disciplina=disciplina)}"
-        f"{estilo.acoes(pagina)}"
+        f"{estilo.acoes(pagina, administrador)}"
         "</div></header>\n"
         f"{corpo}\n"
         f"{estilo.rodape()}\n"
@@ -713,7 +721,7 @@ def _corpo_resultados(
 _EXEMPLOS = ("horários", "critérios de avaliação", "regulamento")
 
 
-def _pagina_inicial(opcoes: str) -> str:
+def _pagina_inicial(opcoes: str, administrador: bool = False) -> str:
     """O heroi: titulo grande, a barra, e tres buscas para experimentar."""
     exemplos = "".join(
         f'<a href="/?{urlencode({"q": termo})}">{html.escape(termo)}</a>'
@@ -724,7 +732,7 @@ def _pagina_inicial(opcoes: str) -> str:
         "<body>\n"
         '<header class="topo"><div class="topo-linha">'
         f"{estilo.marca()}"
-        f"{estilo.acoes()}"
+        f"{estilo.acoes('busca', administrador)}"
         "</div></header>\n"
         '<div class="envolve"><section class="heroi">'
         '<div class="heroi-gato" aria-hidden="true" '
@@ -749,6 +757,7 @@ def _montar_pagina(
     corrigida: bool = False, seccao: str = "", exato: bool = False,
     pagina: int = 1,
 ) -> str:
+    administrador = auth.e_administrador(participante)
     disciplinas: list[str] = []
     if not CAMINHO_BANCO.exists():
         corpo = (
@@ -757,7 +766,7 @@ def _montar_pagina(
             '<p class="lead">Corre: python main.py indexar &lt;caminho&gt;</p>'
             "</div></div>"
         )
-        return _pagina("", "", "", corpo)
+        return _pagina("", "", "", corpo, administrador=administrador)
 
     # A ligacao ao indice e uma so para o processo todo, e a tranca deixa
     # passar uma busca de cada vez. Parece o contrario do que se quer, mas foi
@@ -768,7 +777,7 @@ def _montar_pagina(
     with storage.emprestada(CAMINHO_BANCO) as conexao:
         disciplinas = storage.listar_disciplinas(conexao)
         if not consulta and not disciplina:
-            return _pagina_inicial(_opcoes(disciplinas, ""))
+            return _pagina_inicial(_opcoes(disciplinas, ""), administrador)
         if not consulta and disciplina:
             with uso.partilhada() as registo:
                 corpo = pagina_disciplina.pagina(conexao, registo, disciplina)
@@ -777,6 +786,7 @@ def _montar_pagina(
                 opcoes=_opcoes(disciplinas, disciplina),
                 novidades="",
                 corpo=f'<div class="pagina-apoio">{corpo}</div>',
+                administrador=administrador,
             )
         comeco = time.perf_counter()
         resultado = hibrida.buscar(
@@ -817,6 +827,7 @@ def _montar_pagina(
         novidades="",
         corpo=corpo,
         disciplina=disciplina,
+        administrador=administrador,
     )
 
 
@@ -921,12 +932,54 @@ def _pagina_privacidade() -> str:
     )
 
 
-def _pagina_novidades() -> str:
+def _cartao_post(post) -> str:
+    """Um post da newsletter como os alunos o veem.
+
+    O corpo passa por `marcacao.para_html`, que escapa tudo antes de interpretar
+    a marcacao - o texto foi escrito por uma pessoa e nunca chega a ser HTML.
+    """
+    retrato = media.perfil_de(post.autor)
+    cara = (
+        f'<img class="nl-retrato" src="/perfil/{html.escape(retrato, quote=True)}"'
+        ' alt="">'
+        if retrato
+        else ""
+    )
+    rascunho = (
+        '<span class="rascunho">rascunho</span>' if not post.publicado else ""
+    )
+    return (
+        f'<article class="nl-post" id="post-{post.id}">'
+        f'<p class="nl-meta">{cara}<span>{html.escape(post.data_curta)}</span>'
+        f"<span>{html.escape(post.autor)}</span>{rascunho}</p>"
+        f'<h2 class="nl-cabeca">{html.escape(post.titulo or "Sem título")}</h2>'
+        f'<div class="nl-corpo">{marcacao.para_html(post.corpo)}</div>'
+        "</article>"
+    )
+
+
+def _pagina_novidades(administrador: bool = False) -> str:
+    """A newsletter em cima, o material novo do Moodle em baixo.
+
+    Sao duas coisas diferentes na mesma pagina de proposito. O material novo e
+    automatico - o que o conector encontrou. A newsletter e escrita: e onde cabe
+    o "isto sai no teste" que nenhum ficheiro diz.
+    """
+    posts = newsletter.listar(so_publicados=True)
+    bloco_posts = (
+        "".join(_cartao_post(post) for post in posts)
+        if posts
+        else '<div class="bloco-linhas">'
+        '<p class="grande">Ainda não há nada escrito aqui.</p>'
+        '<p class="pequena">Quando houver, é o primeiro que se lê.</p>'
+        "</div>"
+    )
+
     recentes = novidades.recentes()
     if not recentes:
         bloco = (
             '<div class="bloco-linhas">'
-            '<p class="grande">Ainda n\u00e3o chegou material novo nos \u00faltimos dias.</p>'
+            '<p class="grande">Ainda não chegou material novo nos últimos dias.</p>'
             '<p class="pequena">Quando chegar, aparece aqui.</p>'
             "</div>"
         )
@@ -944,11 +997,22 @@ def _pagina_novidades() -> str:
                 f'<span class="quando">{html.escape(item.data)}</span></li>'
             )
         bloco = f'<ul class="novo-lista">{"".join(linhas)}</ul>'
+
+    escrever = (
+        '<a class="pn-botao" href="/painel/newsletter">escrever um post</a>'
+        if administrador
+        else ""
+    )
     return (
         '<div class="pagina-apoio">'
-        f'<a class="voltar" href="/">{icones.svg("seta-esq", 14)}voltar \u00e0 busca</a>'
-        '<p class="olho">\u00cdndice local</p>'
-        '<h1 class="display h-grande">Material novo</h1>'
+        f'<a class="voltar" href="/">{icones.svg("seta-esq", 14)}voltar à busca</a>'
+        '<p class="olho">Newsletter</p>'
+        '<h1 class="display h-grande">Novidades</h1>'
+        f"{escrever}"
+        f"{bloco_posts}"
+        '<p class="olho" style="margin-top:64px">Do Moodle, automático</p>'
+        '<h2 class="display h-grande" style="font-size:1.6rem;margin-top:8px">'
+        "Material novo</h2>"
         f"{bloco}"
         "</div>"
     )
@@ -1019,14 +1083,69 @@ class _Manipulador(BaseHTTPRequestHandler):
         item = galletas.get(auth.NOME_COOKIE)
         if item is None:
             return None
-        return auth.validar_sessao(item.value, auth.segredo())
+        return auth.participante_da_sessao(item.value, auth.segredo())
 
     def do_POST(self):
-        if urlparse(self.path).path != "/entrar":
-            self.send_error(404)
-            return
+        try:
+            self._tratar_post()
+        except (TimeoutError, ConnectionError, BrokenPipeError):
+            self.close_connection = True
+        except Exception:
+            registo_servidor.excecao(f"POST {self.path[:140]}", "http")
+            try:
+                self.send_error(500, "erro interno")
+            except Exception:
+                self.close_connection = True
+
+    def _tratar_post(self):
         if self._excedeu_limite():
             return
+        caminho = urlparse(self.path).path
+        if caminho == "/entrar":
+            self._entrar()
+            return
+
+        participante = self._participante()
+        if participante is None or not auth.e_administrador(participante):
+            # O mesmo 403 para quem nao entrou e para quem entrou sem ser
+            # administrador, de proposito: a diferenca entre as duas respostas
+            # dizia a quem sonda que o endereco existe e que faltava so o papel.
+            self.send_error(403, "acesso restrito")
+            return
+        presenca.marcar(participante, self.headers.get("User-Agent"), caminho)
+
+        tratadores = {
+            "/painel/utilizadores": self._post_utilizadores,
+            "/painel/automatizacao": self._post_automatizacao,
+            "/painel/newsletter": self._post_newsletter,
+            "/painel/perfil": self._post_perfil,
+            "/painel/api/previa": self._post_previa,
+        }
+        tratador = tratadores.get(caminho)
+        if tratador is None:
+            self.send_error(404)
+            return
+
+        lido = self._ler_formulario()
+        if lido is None:
+            return
+        campos, ficheiros = lido
+        if not auth.csrf_valido(participante, campos.get("csrf")):
+            # Isto nao acontece por acidente: o cookie vai com SameSite=Lax e
+            # nao viaja num POST de outro sitio. Um simbolo errado e alguem a
+            # tentar, ou um formulario aberto de antes de o segredo mudar - e
+            # nos dois casos vale a pena ficar escrito.
+            registo_servidor.anotar(
+                registo_servidor.AVISO,
+                f"símbolo de formulário inválido em {caminho}"
+                f" ({participante})",
+                "http",
+            )
+            self.send_error(403, "pedido não reconhecido")
+            return
+        tratador(campos, ficheiros, participante)
+
+    def _entrar(self) -> None:
         endereco = self._endereco()
         if not _limite_entrada.permitir(endereco):
             self._responder(
@@ -1041,24 +1160,294 @@ class _Manipulador(BaseHTTPRequestHandler):
         codigo = parse_qs(corpo).get("codigo", [""])[0]
         participante = auth.participante_do_codigo(codigo)
         if participante is None:
-            self._responder(_pagina_entrada("Código inválido."), "text/html; charset=utf-8")
+            registo_servidor.anotar(
+                registo_servidor.AVISO, f"código recusado de {endereco}", "entrada"
+            )
+            self._responder(
+                _pagina_entrada("Código inválido."), "text/html; charset=utf-8"
+            )
             return
         _limite_entrada.limpar(endereco)
         sessao = auth.criar_sessao(participante, auth.segredo())
         with uso.partilhada() as registo:
             uso.registar(registo, participante, uso.EVENTO_ENTRADA)
-        self.send_response(303)
-        self.send_header("Location", "/")
-        seguro = "; Secure" if protecao.veio_por_tunel(self) else ""
-        self.send_header(
-            "Set-Cookie",
-            f"{auth.NOME_COOKIE}={sessao}; Path=/; HttpOnly; SameSite=Lax"
-            f"{seguro}; Max-Age={auth.VALIDADE_DIAS * 86400}",
+        registo_servidor.anotar(
+            registo_servidor.INFO, f"{participante} entrou", "entrada"
         )
-        self.send_header("Content-Length", "0")
-        self.end_headers()
+        seguro = "; Secure" if protecao.veio_por_tunel(self) else ""
+        self._para(
+            "/",
+            cookie=(
+                f"{auth.NOME_COOKIE}={sessao}; Path=/; HttpOnly; SameSite=Lax"
+                f"{seguro}; Max-Age={auth.VALIDADE_DIAS * 86400}"
+            ),
+        )
+
+    def _ler_formulario(self):
+        """`(campos, ficheiros)`, ou None se o pedido ja foi respondido.
+
+        Recusa antes de ler quando o `Content-Length` anunciado passa do limite:
+        ler para memoria um corpo que ja se sabe ser grande demais e fazer o
+        trabalho de quem o mandou. A ligacao fecha-se porque o corpo fica no
+        socket sem ser lido, e o pedido seguinte encontraria lixo.
+        """
+        tamanho = int(self.headers.get("Content-Length") or 0)
+        if tamanho <= 0:
+            return {}, []
+        if tamanho > media.LIMITE_CORPO:
+            self.close_connection = True
+            self.send_error(413, "corpo demasiado grande")
+            return None
+        corpo = self.rfile.read(tamanho)
+        tipo = self.headers.get("Content-Type") or ""
+        if tipo.lower().startswith("multipart/form-data"):
+            return media.analisar_multipart(corpo, tipo)
+        texto = corpo.decode("utf-8", errors="replace")
+        campos = {
+            chave: valores[0]
+            for chave, valores in parse_qs(texto, keep_blank_values=True).items()
+        }
+        return campos, []
+
+    # ---------------------------------------------------- accoes do painel
+
+    def _post_utilizadores(self, campos, ficheiros, participante) -> None:
+        accao = campos.get("accao", "")
+        rotulo = (campos.get("rotulo") or "").strip()
+        destino = "/painel/utilizadores"
+
+        if accao == "revogar":
+            if rotulo == participante:
+                painel.deixar_recado(
+                    participante,
+                    "Não te podes revogar a ti mesmo — ficavas de fora do painel.",
+                    mau=True,
+                )
+            elif auth.revogar(rotulo):
+                registo_servidor.anotar(
+                    registo_servidor.AVISO,
+                    f"{participante} revogou {rotulo}",
+                    "gestao",
+                )
+                painel.deixar_recado(
+                    participante,
+                    f"{rotulo} revogado. O código deixou de funcionar e a sessão"
+                    " aberta fechou-se.",
+                )
+            else:
+                painel.deixar_recado(
+                    participante, f"Não encontrei {rotulo}.", mau=True
+                )
+            self._para(destino)
+            return
+
+        if accao == "novo-codigo":
+            codigo = auth.novo_codigo(rotulo)
+            if codigo is None:
+                painel.deixar_recado(
+                    participante, f"Não encontrei {rotulo}.", mau=True
+                )
+            else:
+                registo_servidor.anotar(
+                    registo_servidor.AVISO,
+                    f"{participante} gerou código novo para {rotulo}",
+                    "gestao",
+                )
+                painel.deixar_recado(
+                    participante,
+                    f"Código novo para {rotulo}. A sessão anterior foi fechada.",
+                    codigos=[(codigo, rotulo)],
+                )
+            self._para(destino)
+            return
+
+        if accao == "criar":
+            bruto = (campos.get("quantos") or "1").strip()
+            quantos = int(bruto) if bruto.isdigit() else 0
+            if not 1 <= quantos <= 40:
+                painel.deixar_recado(
+                    participante, "Quantos? Entre 1 e 40.", mau=True
+                )
+                self._para(destino)
+                return
+            prefixo = "admin" if campos.get("papel") == "admin" else "aluno"
+            novos = auth.criar_participantes(quantos, prefixo)
+            registo_servidor.anotar(
+                registo_servidor.AVISO,
+                f"{participante} criou {quantos} código(s) de {prefixo}",
+                "gestao",
+            )
+            painel.deixar_recado(
+                participante,
+                f"{quantos} código(s) criado(s). Copia-os agora.",
+                codigos=sorted(novos.items(), key=lambda par: par[1]),
+            )
+            self._para(destino)
+            return
+
+        self.send_error(400, "ação desconhecida")
+
+    def _post_automatizacao(self, campos, ficheiros, participante) -> None:
+        accao = campos.get("accao", "")
+        comecou, porque = operacoes.iniciar(accao)
+        if comecou:
+            registo_servidor.anotar(
+                registo_servidor.INFO,
+                f"{participante} pediu: {operacoes.NOMES[accao]}",
+                "gestao",
+            )
+            painel.deixar_recado(
+                participante,
+                f"{operacoes.NOMES[accao]}: a correr. O que vai dizendo aparece"
+                " na consola abaixo.",
+            )
+        else:
+            painel.deixar_recado(participante, porque.capitalize(), mau=True)
+        self._para("/painel/automatizacao")
+
+    def _post_newsletter(self, campos, ficheiros, participante) -> None:
+        accao = campos.get("accao", "")
+        bruto = (campos.get("id") or "").strip()
+        identificador = int(bruto) if bruto.isdigit() else None
+
+        if accao == "apagar-media":
+            nome = campos.get("nome") or ""
+            if media.apagar(nome):
+                painel.deixar_recado(participante, "Ficheiro apagado.")
+            else:
+                painel.deixar_recado(
+                    participante, "Não consegui apagar esse ficheiro.", mau=True
+                )
+            self._para("/painel/newsletter")
+            return
+
+        if accao == "apagar":
+            if identificador is not None and newsletter.apagar(identificador):
+                painel.deixar_recado(participante, "Post apagado.")
+            else:
+                painel.deixar_recado(participante, "Esse post já não existe.", mau=True)
+            self._para("/painel/newsletter")
+            return
+
+        if accao in ("publicar", "despublicar"):
+            quer = accao == "publicar"
+            # Vindo do editor, guarda-se o texto que esta no ecra antes de
+            # publicar: publicar uma versao mais antiga do que a que se esta a
+            # ver seria a pior surpresa possivel neste botao.
+            if identificador is not None and "corpo" in campos:
+                newsletter.guardar(
+                    campos.get("titulo", ""),
+                    campos.get("corpo", ""),
+                    participante,
+                    identificador=identificador,
+                    publicado=quer,
+                )
+                post = newsletter.obter(identificador)
+            else:
+                post = (
+                    newsletter.marcar_publicado(identificador, quer)
+                    if identificador is not None
+                    else None
+                )
+            if post is None:
+                painel.deixar_recado(participante, "Esse post já não existe.", mau=True)
+                self._para("/painel/newsletter")
+                return
+            painel.deixar_recado(
+                participante,
+                "Publicado. A turma já o vê em /novidades."
+                if quer
+                else "Voltou a rascunho. Deixou de aparecer em /novidades.",
+            )
+            self._para(f"/painel/newsletter?id={post.id}")
+            return
+
+        if accao in ("guardar", "carregar"):
+            post = newsletter.guardar(
+                campos.get("titulo", ""),
+                campos.get("corpo", ""),
+                participante,
+                identificador=identificador,
+            )
+            if accao == "guardar":
+                painel.deixar_recado(participante, "Guardado.")
+                self._para(f"/painel/newsletter?id={post.id}")
+                return
+
+            escolhidos = [f for f in ficheiros if f.campo == "media"]
+            if not escolhidos:
+                painel.deixar_recado(
+                    participante, "Guardado, mas não escolheste ficheiro.", mau=True
+                )
+                self._para(f"/painel/newsletter?id={post.id}")
+                return
+            nome, erro = media.guardar(escolhidos[0])
+            if erro:
+                painel.deixar_recado(participante, f"O ficheiro não entrou: {erro}", mau=True)
+                self._para(f"/painel/newsletter?id={post.id}")
+                return
+            juntado = (post.corpo.rstrip() + "\n\n" + media.marcacao_de(nome) + "\n")
+            post = newsletter.guardar(
+                post.titulo, juntado, participante, identificador=post.id
+            )
+            painel.deixar_recado(
+                participante, "Ficheiro carregado e inserido no fim do texto."
+            )
+            self._para(f"/painel/newsletter?id={post.id}")
+            return
+
+        self.send_error(400, "ação desconhecida")
+
+    def _post_perfil(self, campos, ficheiros, participante) -> None:
+        accao = campos.get("accao", "")
+        if accao == "apagar":
+            atual = media.perfil_de(participante)
+            if atual:
+                try:
+                    (media.PASTA_PERFIL / atual).unlink()
+                    painel.deixar_recado(participante, "Foto removida.")
+                except OSError as erro:
+                    painel.deixar_recado(
+                        participante, f"Não consegui remover: {erro}", mau=True
+                    )
+            self._para("/painel/perfil")
+            return
+
+        escolhidos = [f for f in ficheiros if f.campo == "foto"]
+        if not escolhidos:
+            painel.deixar_recado(participante, "Não escolheste imagem.", mau=True)
+            self._para("/painel/perfil")
+            return
+        _, erro = media.guardar_perfil(participante, escolhidos[0])
+        if erro:
+            painel.deixar_recado(participante, f"A foto não entrou: {erro}", mau=True)
+        else:
+            painel.deixar_recado(participante, "Foto guardada.")
+        self._para("/painel/perfil")
+
+    def _post_previa(self, campos, ficheiros, participante) -> None:
+        self._responder(
+            painel.json_previa(campos.get("corpo", "")),
+            "application/json; charset=utf-8",
+        )
 
     def do_GET(self):
+        # A rede de seguranca existe porque isto corre sem ninguem a ver. Um
+        # estouro dentro de um pedido matava o fio em silencio e o aluno via
+        # apenas uma pagina que nao carrega; agora fica escrito no registo, que
+        # e o que o painel mostra.
+        try:
+            self._tratar_get()
+        except (TimeoutError, ConnectionError, BrokenPipeError):
+            self.close_connection = True
+        except Exception:
+            registo_servidor.excecao(f"GET {self.path[:140]}", "http")
+            try:
+                self.send_error(500, "erro interno")
+            except Exception:
+                self.close_connection = True
+
+    def _tratar_get(self):
         if self._excedeu_limite():
             return
         url = urlparse(self.path)
@@ -1071,8 +1460,18 @@ class _Manipulador(BaseHTTPRequestHandler):
                 novidades="",
                 corpo=_pagina_privacidade(),
                 pagina="privacidade",
+                administrador=auth.e_administrador(self._participante()),
             )
             self._responder(corpo.encode("utf-8"), "text/html; charset=utf-8")
+            return
+
+        if url.path == "/favicon.ico":
+            # A pagina declara `<link rel="icon">`, e mesmo assim os browsers
+            # pedem /favicon.ico. Sem isto o pedido caia na barreira de sessao e
+            # levava 403, o que enchia o registo de avisos sobre um pedido
+            # perfeitamente normal. Fica antes da barreira, como a restante
+            # marca: e o mesmo ficheiro que /estatico/icone.png.
+            self._servir_estatico("/estatico/icone.png")
             return
 
         if url.path == "/robots.txt":
@@ -1109,6 +1508,24 @@ class _Manipulador(BaseHTTPRequestHandler):
                 self.send_error(403, "acesso restrito")
             return
 
+        # Marcar presenca antes de servir o que for: e isto que faz a coluna
+        # "visto" do painel dizer a verdade sobre quem esta ca. A escrita e
+        # estrangulada em `presenca.py`, portanto isto nao custa um acesso a
+        # disco por pedido.
+        presenca.marcar(participante, self.headers.get("User-Agent"), url.path)
+        administrador = auth.e_administrador(participante)
+
+        if url.path.startswith("/media/") or url.path.startswith("/perfil/"):
+            self._servir_media(url.path)
+            return
+
+        if url.path == "/painel" or url.path.startswith("/painel/"):
+            if not administrador:
+                self.send_error(403, "acesso restrito")
+                return
+            self._servir_painel(url, parametros, participante)
+            return
+
         if url.path == "/sugerir":
             self._servir_sugestoes(parametros, participante)
             return
@@ -1126,17 +1543,20 @@ class _Manipulador(BaseHTTPRequestHandler):
                 consulta="",
                 opcoes=_opcoes(_disciplinas_disponiveis(), ""),
                 novidades="",
-                corpo=_pagina_novidades(),
+                corpo=_pagina_novidades(administrador),
                 pagina="novidades",
+                administrador=administrador,
             )
             self._responder(corpo.encode("utf-8"), "text/html; charset=utf-8")
             return
         if url.path == "/estatisticas":
-            with uso.partilhada() as registo:
-                corpo = estatisticas.pagina(
-                    registo, auth.e_administrador(participante)
-                ).encode("utf-8")
-            self._responder(corpo, "text/html; charset=utf-8")
+            # Passou a ser so do administrador, e passou a viver dentro do
+            # painel. O endereco antigo continua a responder porque anda em
+            # marcadores e em capturas de ecra do manual - reencaminha.
+            if not administrador:
+                self.send_error(403, "acesso restrito")
+                return
+            self._para(painel.caminho_de(painel.VISAO))
             return
         if url.path != "/":
             self.send_error(404)
@@ -1154,6 +1574,90 @@ class _Manipulador(BaseHTTPRequestHandler):
             consulta, disciplina, participante, corrigida, seccao, exato, pagina
         )
         self._responder(corpo.encode("utf-8"), "text/html; charset=utf-8")
+
+    def _para(self, destino: str, cookie: str | None = None) -> None:
+        """303 para `destino`. Depois de um POST, sempre.
+
+        Sem o reencaminhamento, recarregar a pagina repetia o pedido - e uma das
+        accoes deste painel e revogar um acesso. O 303 e nao o 302 porque diz ao
+        browser para trocar o metodo por GET, que e o que se quer aqui.
+
+        `destino` nunca vem de fora: sao literais e ids numericos. Aceitar um
+        endereco de fora seria transformar isto num reencaminhador aberto.
+        """
+        self.send_response(303)
+        self.send_header("Location", destino)
+        if cookie:
+            self.send_header("Set-Cookie", cookie)
+        self.send_header("Content-Length", "0")
+        for chave, valor in protecao.CABECALHOS_SEGURANCA.items():
+            self.send_header(chave, valor)
+        self.end_headers()
+
+    def _servir_media(self, caminho: str) -> None:
+        """Imagens, GIFs, videos e retratos - atras da barreira de sessao.
+
+        Fica dentro da sessao de proposito, ao contrario de `/estatico/`: aquilo
+        e a marca e os tipos de letra, isto e conteudo que o administrador poe
+        para a turma. Um endereco publico deixava a biblioteca de media do
+        projeto acessivel a quem adivinhasse um nome.
+        """
+        se_perfil = caminho.startswith("/perfil/")
+        if se_perfil:
+            nome, pasta = caminho.removeprefix("/perfil/"), media.PASTA_PERFIL
+        else:
+            nome, pasta = caminho.removeprefix("/media/"), media.PASTA
+        dados, tipo = media.ler(nome, pasta)
+        if not dados:
+            self.send_error(404)
+            return
+        # A media tem nome de resumo do conteudo: muda de nome quando muda, e
+        # por isso pode ficar em cache um dia. O retrato tem nome de rotulo e e
+        # substituido no mesmo nome - esse nao pode.
+        self._responder(dados, tipo, cache=not se_perfil)
+
+    def _servir_painel(self, url, parametros, participante: str) -> None:
+        if url.path.startswith("/painel/api/"):
+            self._api_painel(
+                url.path.removeprefix("/painel/api/"), parametros, participante
+            )
+            return
+
+        seccao = url.path.removeprefix("/painel").strip("/") or painel.VISAO
+        if seccao not in painel.CHAVES:
+            self.send_error(404)
+            return
+
+        contexto = painel.tirar_recado(participante)
+        if seccao == painel.NEWSLETTER:
+            bruto = parametros.get("id", [""])[0]
+            if parametros.get("novo", [""])[0] == "1":
+                contexto["novo"] = True
+            elif bruto.isdigit():
+                post = newsletter.obter(int(bruto))
+                if post is None:
+                    contexto["recado"] = "Esse post já não existe."
+                    contexto["recado_mau"] = True
+                else:
+                    contexto["post"] = post
+
+        with uso.partilhada() as registo:
+            corpo = painel.pagina(seccao, participante, registo, contexto)
+        self._responder(corpo.encode("utf-8"), "text/html; charset=utf-8")
+
+    def _api_painel(self, nome: str, parametros, participante: str) -> None:
+        if nome != "vivo":
+            self.send_error(404)
+            return
+        bruto = parametros.get("desde", ["0"])[0]
+        desde = int(bruto) if bruto.isdigit() else 0
+        quero = parametros.get("quero", [""])[0][:60]
+        origem = parametros.get("origem", [""])[0][:80]
+        with uso.partilhada() as registo:
+            corpo = painel.json_vivo(registo, quero, desde, origem)
+        # Sem cache, e dito: e uma resposta que muda a cada dois segundos e meio
+        # e que nao deve ficar guardada em intermediario nenhum.
+        self._responder(corpo, "application/json; charset=utf-8", cache=False)
 
     def _servir_estatico(self, caminho: str) -> None:
         """Serve os ficheiros da marca e a biblioteca de animacoes."""
@@ -1269,7 +1773,31 @@ class _Manipulador(BaseHTTPRequestHandler):
         self.wfile.write(corpo)
 
     def log_message(self, formato, *args) -> None:
-        pass
+        """Deixou de ser um `pass`: o painel mostra isto ao vivo.
+
+        Em memoria e nao em disco, porque a linha de um pedido leva consigo o
+        que a pessoa escreveu na caixa de busca (`GET /?q=...`) - e isso nao tem
+        razao para ficar gravado sem prazo de validade. Avisos e erros vao a
+        disco; esses nao levam consultas.
+        """
+        try:
+            texto = formato % args
+            # A consola do painel pergunta por novidades de dois em dois
+            # segundos e meio. Registar essa pergunta fazia o registo encher-se
+            # de si proprio: vinte e quatro linhas por minuto a dizer que o
+            # painel esteve a ver o painel, e o acontecimento verdadeiro
+            # enterrado no meio. Visto ao vivo com a pagina aberta.
+            if "/painel/api/" in texto:
+                return
+            registo_servidor.anotar(registo_servidor.INFO, texto, "http")
+        except Exception:
+            pass
+
+    def log_error(self, formato, *args) -> None:
+        try:
+            registo_servidor.anotar(registo_servidor.AVISO, formato % args, "http")
+        except Exception:
+            pass
 
 
 def iniciar(porta: int = 8080, host: str = "127.0.0.1") -> None:
@@ -1297,6 +1825,9 @@ def iniciar(porta: int = 8080, host: str = "127.0.0.1") -> None:
         return
     if host != "127.0.0.1":
         print(f"ATENCAO: a aceitar ligacoes de {host} - acesso so por codigo.")
+    registo_servidor.anotar(
+        registo_servidor.INFO, f"servidor no ar em {host}:{porta}", "arranque"
+    )
     print(f"Madalena no ar em http://{host}:{porta} (Ctrl+C encerra)")
     try:
         servidor.serve_forever()

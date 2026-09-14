@@ -89,7 +89,18 @@ def _metrica(rotulo: str, valor: str) -> str:
     )
 
 
-def pagina(conexao, administrador: bool = False) -> str:
+def corpo(conexao, administrador: bool = False) -> str:
+    """As metricas e os graficos, sem pagina em volta.
+
+    Existe separado de `pagina` porque o painel de administracao mostra isto
+    dentro da sua propria moldura, com a navegacao lateral ao lado. Duplicar a
+    montagem dos graficos era garantir que as duas versoes se afastavam.
+
+    `minimo_participantes` continua aqui e continua a servir: mesmo agora que
+    esta pagina e so do administrador, a diferenca entre "1" e "2" e a diferenca
+    entre ver uma consulta que so uma pessoa fez e nao a ver. Com sete
+    participantes, uma consulta unica identifica quem a escreveu.
+    """
     # Sem privilegios, so agregados: nada que identifique um colega.
     minimo = 1 if administrador else 2
     dados = uso.resumo(conexao)
@@ -133,20 +144,32 @@ def pagina(conexao, administrador: bool = False) -> str:
         )
 
     return (
+        f'<div class="metricas">{metricas}</div>'
+        f'<div class="duas-colunas">{"".join(duas)}</div>'
+        f'<div class="duas-colunas">{"".join(resto)}</div>'
+        f"{rodape_nota}"
+    )
+
+
+def pagina(conexao, administrador: bool = False) -> str:
+    """A pagina inteira de estatisticas, com moldura propria.
+
+    Continua a existir para quem quer so isto, e e o que os testes desenham. O
+    caminho `/estatisticas` reencaminha para o painel, que mostra o mesmo corpo
+    com a navegacao ao lado.
+    """
+    return (
         f"{estilo.cabeca('Madalena - estatísticas')}\n"
         "<body>\n"
         '<header class="topo"><div class="topo-linha">'
         f"{estilo.marca()}"
-        f"{estilo.acoes('estatisticas')}"
+        f"{estilo.acoes('estatisticas', administrador)}"
         "</div></header>\n"
         '<div class="pagina-apoio">'
         f'<a class="voltar" href="/">{icones.svg("seta-esq", 14)}voltar à busca</a>'
         '<p class="olho">Visão geral</p>'
         '<h1 class="display h-grande">Estatísticas</h1>'
-        f'<div class="metricas">{metricas}</div>'
-        f'<div class="duas-colunas">{"".join(duas)}</div>'
-        f'<div class="duas-colunas">{"".join(resto)}</div>'
-        f"{rodape_nota}"
+        f"{corpo(conexao, administrador)}"
         "</div>\n"
         '<footer class="rodape">'
         "<span>Dados pseudonimizados</span>"

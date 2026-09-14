@@ -31,6 +31,10 @@ CABECALHOS_SEGURANCA = {
     "Content-Security-Policy": (
         "default-src 'self'; script-src 'self' 'unsafe-inline'; "
         "style-src 'self' 'unsafe-inline'; img-src 'self' data:; "
+        # media-src: o <video> de um post da newsletter. O default-src cobriria
+        # isto, mas declarar e o que torna a politica legivel - quem a le fica a
+        # saber que ha video e que ele vem so de casa.
+        "media-src 'self'; "
         "object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
     ),
     "Permissions-Policy": "geolocation=(), microphone=(), camera=()",

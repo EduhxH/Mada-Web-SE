@@ -71,7 +71,10 @@ def test_pagina_de_estatisticas_gera_html(tmp_path):
     conexao = _registo(tmp_path)
     uso.registar(conexao, "aluno-01", uso.EVENTO_BUSCA, consulta="ficha", resultados=2)
     pagina = estatisticas.pagina(conexao)
-    assert "estatisticas" in pagina
+    # O titulo, e nao a ligacao "/estatisticas" que aqui estava: essa desapareceu
+    # do cabecalho quando a pagina passou a ser so do administrador, dentro do
+    # painel. O que o teste quer saber e que a pagina se desenha.
+    assert "Estatísticas" in pagina
     assert "1" in pagina  # o cartao das buscas
     # Com um dia so nao ha grafico: uma barra sozinha nao compara nada.
     # Procura-se <rect> e nao <svg>: a pagina tem sempre SVG, que e como os
@@ -167,3 +170,30 @@ def test_resumo_curto_escapa_rotulos():
     saida = estatisticas._barras([("<script>", 3)], "T")
     assert "<script>" not in saida
     assert "&lt;script&gt;" in saida
+
+
+def test_zerar_apaga_tudo(tmp_path):
+    conexao = _registo(tmp_path)
+    uso.registar(conexao, "aluno-01", uso.EVENTO_BUSCA, consulta="ficha", resultados=3)
+    uso.registar(conexao, "aluno-02", uso.EVENTO_ABERTURA, doc_id=7)
+    assert uso.zerar(conexao) == 2
+    assert uso.resumo(conexao)["buscas"] == 0
+    assert uso.resumo(conexao)["participantes"] == 0
+
+
+def test_zerar_devolve_o_espaco_ao_disco(tmp_path):
+    """Sem o VACUUM as consultas antigas ficavam legiveis nas paginas livres."""
+    caminho = tmp_path / "uso.sqlite3"
+    conexao = uso.abrir(caminho)
+    for numero in range(400):
+        uso.registar(
+            conexao, f"aluno-{numero % 8:02d}", uso.EVENTO_BUSCA,
+            consulta=f"consulta-secreta-numero-{numero}", resultados=2,
+        )
+    uso.zerar(conexao)
+    conexao.close()
+    assert b"consulta-secreta" not in caminho.read_bytes()
+
+
+def test_zerar_base_vazia_nao_rebenta(tmp_path):
+    assert uso.zerar(_registo(tmp_path)) == 0

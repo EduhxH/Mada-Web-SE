@@ -18,6 +18,14 @@ from app.search.snippet import gerar_trecho
 
 CAMINHO_BANCO = Path("data") / "indice.sqlite3"
 
+# Codigos de saida, para as tarefas agendadas poderem decidir sem ler texto.
+# Reindexar sao dois minutos: tres vezes por dia, todos os dias, sao seis
+# minutos gastos por nada nos dias em que nenhum professor publicou. O
+# agendador pergunta "houve novidade?" ao codigo de saida e so paga o
+# reindexar quando a resposta e sim.
+SAIDA_FALHA = 1
+SAIDA_NOVIDADE = 10
+
 
 def imprimir_relatorio(relatorio: Relatorio) -> None:
     print()
@@ -194,38 +202,35 @@ def comando_atualizar(
     imprimir_relatorio(relatorio)
 
 
-def comando_horario(forcar: bool = False) -> None:
-    """Vigia o PDF de horarios da escola, que muda todas as semanas."""
-    from datetime import datetime
+def comando_horario(forcar: bool = False) -> int:
+    """Vigia o PDF de horarios da escola, que muda todas as semanas.
 
-    agora = datetime.now()
-    estado = horarios.ler_estado()
-    if not forcar:
-        vale, motivo = horarios.deve_verificar(agora, estado)
-        if not vale:
-            print(f"Nada a fazer: {motivo}.")
-            if estado.get("ultima_mudanca"):
-                print(f"  ultimo horario novo em {estado['ultima_mudanca']}")
-            return
+    Devolve SAIDA_NOVIDADE quando apanhou um horario novo, para o agendador
+    poder reindexar so nessa vez. Nos dias em que o horario nao sai, isto sai
+    sem tocar na rede - por isso pode correr de hora a hora.
+    """
+    from app.crawler import rotina
 
-    try:
-        url_base, utilizador, senha = moodle.configuracao()
-        sessao = moodle.iniciar_sessao(url_base, utilizador, senha)
-    except moodle.ErroMoodle as erro:
-        print(f"  {erro}")
-        return
-    except Exception as erro:
-        print(f"  Falhou a entrada no Moodle: {erro}")
-        return
+    resultado = rotina.vigiar_horario(forcar=forcar)
+    if resultado.falhou:
+        print(f"  {resultado.erro}")
+        return SAIDA_FALHA
 
-    resultado = horarios.verificar(sessao, url_base, agora, forcar=forcar)
-    print(resultado.motivo.capitalize() + ".")
-    if resultado.mudou:
-        mb = resultado.bytes_guardados / 1024 / 1024
-        print(f"  guardado em {horarios.PASTA} ({mb:.1f} MB)")
-        print()
-        print("Falta reindexar para ficar pesquisavel:")
-        print("  python main.py atualizar --sem-rastreio")
+    print(resultado.resumo().capitalize() + ".")
+    if not resultado.verificou:
+        estado = horarios.ler_estado()
+        if estado.get("ultima_mudanca"):
+            print(f"  ultimo horario novo em {estado['ultima_mudanca']}")
+        return 0
+    if not resultado.mudou:
+        return 0
+
+    mb = resultado.bytes_guardados / 1024 / 1024
+    print(f"  guardado em {horarios.PASTA} ({mb:.1f} MB)")
+    print()
+    print("Falta reindexar para ficar pesquisavel:")
+    print("  python main.py atualizar --sem-rastreio")
+    return SAIDA_NOVIDADE
 
 
 def comando_verificar_moodle(
@@ -235,105 +240,83 @@ def comando_verificar_moodle(
 
     Um pedido por disciplina em vez das centenas de uma sincronizacao
     completa, para poder correr todos os dias sem incomodar o servidor da
-    escola. Devolve quantos documentos novos entraram.
+    escola. Devolve um codigo de saida: SAIDA_NOVIDADE se entrou material
+    novo, SAIDA_FALHA se nem chegou a verificar, 0 se nao havia nada.
+
+    A contabilidade toda vive em `app/crawler/rotina.py`, partilhada com o
+    botao "verificar agora" do painel. Aqui fica so a forma de o contar na
+    consola.
     """
-    raiz = Path("data") / "raw" / "psi9"
-    inicio = time.perf_counter()
+    from app.crawler import rotina
 
-    try:
-        novos, vistos = moodle.verificar(raiz, disciplinas, intervalo)
-    except moodle.ErroMoodle as erro:
-        print(f"  {erro}")
-        return 0
-    except Exception as erro:
-        print(f"  Falhou a verificacao: {erro}")
-        return 0
+    resultado = rotina.verificar_conteudos(disciplinas, intervalo)
+    if resultado.falhou:
+        print(f"  {resultado.erro}")
+        return SAIDA_FALHA
 
-    duracao = time.perf_counter() - inicio
-    print(f"{vistos} modulos verificados em {duracao:.0f}s")
-
-    if not novos:
+    print(f"{resultado.vistos} modulos verificados em {resultado.segundos:.0f}s")
+    if not resultado.novos:
         print("  Nada de novo.")
         return 0
 
     print()
-    print(f"{len(novos)} novidade(s):")
-    for item in novos:
+    print(f"{len(resultado.novos)} novidade(s):")
+    for item in resultado.novos:
         print(f"  {item.disciplina[:26]:<28} {item.titulo[:44]}")
 
     print()
     print("A descarregar so o que e novo...")
-    antes = moodle.modulos_com_ficheiros(raiz)
-    relatorio = moodle.sincronizar(
-        raiz,
-        disciplinas_pedidas=disciplinas,
-        intervalo=intervalo,
-        apenas={item.identificador for item in novos},
-    )
     print(
-        f"  {relatorio.ficheiros} ficheiros"
-        f" ({relatorio.bytes_totais / 1024 / 1024:.1f} MB)"
+        f"  {resultado.ficheiros} ficheiros"
+        f" ({resultado.bytes_totais / 1024 / 1024:.1f} MB)"
     )
+    if resultado.esteris:
+        print(
+            f"  {resultado.esteris} sem ficheiro"
+            " (pasta vazia ou formato que nao lemos)"
+        )
+    if resultado.registadas:
+        print(f"  {resultado.registadas} registadas para mostrar na interface")
 
-    # Marcar tudo o que foi examinado, mesmo o que nao deu ficheiro: senao
-    # uma pasta vazia e anunciada como novidade todos os dias. A
-    # sincronizacao completa volta a tentar tudo, por isso nada fica perdido.
-    moodle.marcar_vistos(raiz, {item.identificador for item in novos})
-
-    produziram = moodle.modulos_com_ficheiros(raiz) - antes
-    esteris = len(novos) - len(produziram)
-    if esteris:
-        print(f"  {esteris} sem ficheiro (pasta vazia ou formato que nao lemos)")
-
-    guardadas = novidades.registar(
-        [
-            (item.disciplina, item.titulo, item.url)
-            for item in novos
-            if item.identificador in produziram
-        ]
-    )
-    if guardadas:
-        print(f"  {guardadas} registadas para mostrar na interface")
-
-    if not relatorio.ficheiros:
+    if not resultado.houve_novidade:
         return 0
 
     print()
     print("Falta reindexar para ficarem pesquisaveis:")
     print("  python main.py atualizar --sem-rastreio")
-    return relatorio.ficheiros
+    return SAIDA_NOVIDADE
 
 
 def comando_moodle(
     disciplinas: list[str] | None, intervalo: float, limite: int,
     listar: bool, diagnostico: bool = False, verificar: bool = False,
-) -> None:
+) -> int:
     try:
         url_base, utilizador, _ = moodle.configuracao()
     except moodle.ErroMoodle as erro:
         print(erro)
-        return
+        return SAIDA_FALHA
 
     if verificar:
-        comando_verificar_moodle(disciplinas, intervalo)
-        return
+        return comando_verificar_moodle(disciplinas, intervalo)
 
     if diagnostico:
         try:
             moodle.diagnosticar_pasta(Path("data") / "pagina-pasta.html")
         except moodle.ErroMoodle as erro:
             print(f"  {erro}")
-        return
+            return SAIDA_FALHA
+        return 0
 
     print(f"A entrar em {url_base} como {utilizador}...")
     try:
         sessao = moodle.iniciar_sessao(*moodle.configuracao())
     except moodle.ErroMoodle as erro:
         print(f"  {erro}")
-        return
+        return SAIDA_FALHA
     except Exception as erro:
         print(f"  Falhou: {erro}")
-        return
+        return SAIDA_FALHA
     print("  Sessao iniciada.")
 
     todas = moodle.listar_disciplinas(sessao, url_base)
@@ -342,11 +325,11 @@ def comando_moodle(
         print(f"{len(todas)} disciplina(s) inscritas:")
         for identificador, nome in todas:
             print(f"  {identificador:>6}  {nome}")
-        return
+        return 0
 
     if not todas:
         print("  Nenhuma disciplina encontrada.")
-        return
+        return SAIDA_FALHA
 
     raiz = Path("data") / "raw" / "psi9"
     inicio = time.perf_counter()
@@ -396,6 +379,7 @@ def comando_moodle(
 
     print()
     print("Agora indexe: python main.py atualizar --sem-rastreio")
+    return SAIDA_NOVIDADE if relatorio.ficheiros else 0
 
 
 def comando_disciplinas() -> None:
@@ -409,9 +393,50 @@ def comando_disciplinas() -> None:
     conexao.close()
 
 
+PALAVRA_DE_CONFIRMACAO = "APAGAR"
+
+
+def _confirmado(aviso: str, sim: bool) -> bool:
+    """Pede confirmacao escrita antes de algo que nao tem volta.
+
+    A flag `--sim` existe para as tarefas agendadas, que nao tem ninguem ao
+    teclado. Quem esta ao teclado escreve a palavra: um `y/n` a pressa e
+    aceite por engano, uma palavra em maiusculas nao.
+    """
+    if sim:
+        return True
+    print(aviso)
+    print(f'Escreva {PALAVRA_DE_CONFIRMACAO} para continuar, ou nada para desistir.')
+    try:
+        resposta = input("> ").strip()
+    except (EOFError, KeyboardInterrupt):
+        print()
+        resposta = ""
+    if resposta != PALAVRA_DE_CONFIRMACAO:
+        print("Nada foi apagado.")
+        return False
+    return True
+
+
 def comando_participantes(
-    criar: int, revogar: str | None, prefixo: str = "aluno"
+    criar: int, revogar: str | None, prefixo: str = "aluno",
+    zerar: bool = False, sim: bool = False,
 ) -> None:
+    if zerar:
+        quantos = len(auth.carregar_participantes())
+        if not quantos:
+            print("Nao ha codigos para apagar.")
+            return
+        if not _confirmado(
+            f"Isto revoga os {quantos} codigos existentes."
+            " Quem os tiver deixa de entrar.",
+            sim,
+        ):
+            return
+        print(f"{auth.zerar_participantes()} codigos revogados.")
+        if not criar:
+            return
+
     if revogar:
         if auth.revogar(revogar):
             print(f"Revogado: {revogar}")
@@ -440,8 +465,20 @@ def comando_participantes(
     print("  python main.py participantes --revogar aluno-03 --criar 1")
 
 
-def comando_estatisticas() -> None:
+def comando_estatisticas(zerar: bool = False, sim: bool = False) -> None:
     conexao = uso.abrir()
+    if zerar:
+        total = uso.resumo(conexao)["buscas"]
+        if not _confirmado(
+            f"Isto apaga o registo de uso inteiro ({total} buscas e tudo o"
+            " resto). Nao ha volta.",
+            sim,
+        ):
+            conexao.close()
+            return
+        print(f"{uso.zerar(conexao)} eventos apagados. O registo esta vazio.")
+        conexao.close()
+        return
     dados = uso.resumo(conexao)
     print("Resumo de utilizacao")
     print(f"  buscas .............. {dados['buscas']}")
@@ -565,7 +602,21 @@ def main() -> None:
         "--admin", action="store_true",
         help="cria um codigo de administrador (ve as estatisticas completas)",
     )
-    subcomandos.add_parser("estatisticas", help="resumo de utilizacao")
+    p_part.add_argument(
+        "--zerar", action="store_true",
+        help="revoga todos os codigos existentes (pode juntar-se a --criar)",
+    )
+    p_part.add_argument(
+        "--sim", action="store_true", help="nao pede confirmacao"
+    )
+    p_estat = subcomandos.add_parser("estatisticas", help="resumo de utilizacao")
+    p_estat.add_argument(
+        "--zerar", action="store_true",
+        help="apaga o registo de uso inteiro, para comecar um piloto limpo",
+    )
+    p_estat.add_argument(
+        "--sim", action="store_true", help="nao pede confirmacao"
+    )
     p_dados = subcomandos.add_parser(
         "dados", help="ver, exportar ou apagar o registo de um participante"
     )
@@ -626,6 +677,10 @@ def main() -> None:
     )
 
     argumentos = analisador.parse_args()
+    sys.exit(_despachar(argumentos) or 0)
+
+
+def _despachar(argumentos) -> int | None:
     if argumentos.comando == "indexar":
         comando_indexar(argumentos.caminho)
     elif argumentos.comando == "buscar":
@@ -644,9 +699,11 @@ def main() -> None:
             argumentos.criar,
             argumentos.revogar,
             "admin" if argumentos.admin else "aluno",
+            argumentos.zerar,
+            argumentos.sim,
         )
     elif argumentos.comando == "estatisticas":
-        comando_estatisticas()
+        comando_estatisticas(argumentos.zerar, argumentos.sim)
     elif argumentos.comando == "dados":
         comando_dados(
             argumentos.rotulo,
@@ -655,7 +712,7 @@ def main() -> None:
             argumentos.limpar_antigos,
         )
     elif argumentos.comando == "moodle":
-        comando_moodle(
+        return comando_moodle(
             argumentos.disciplinas,
             argumentos.intervalo,
             argumentos.limite,
@@ -664,7 +721,7 @@ def main() -> None:
             argumentos.verificar,
         )
     elif argumentos.comando == "horario":
-        comando_horario(argumentos.forcar)
+        return comando_horario(argumentos.forcar)
     elif argumentos.comando == "atualizar":
         comando_atualizar(
             argumentos.url,
@@ -674,6 +731,7 @@ def main() -> None:
         )
     else:
         modo_interativo()
+    return 0
 
 
 if __name__ == "__main__":

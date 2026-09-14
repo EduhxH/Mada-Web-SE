@@ -38,7 +38,29 @@ CREATE TABLE IF NOT EXISTS eventos (
 );
 CREATE INDEX IF NOT EXISTS idx_eventos_tipo ON eventos(tipo);
 CREATE INDEX IF NOT EXISTS idx_eventos_dia ON eventos(dia);
+
+-- Uma linha por participante, reescrita: "esteve aqui a esta hora, deste tipo
+-- de aparelho, nesta pagina". Nao guarda historico de proposito - para saber o
+-- que alguem fez ha uma semana ja existe a tabela de eventos, e duplicar isso
+-- aqui era guardar duas vezes a mesma coisa sobre uma pessoa.
+--
+-- Repare-se no que NAO esta nas colunas: nem o endereco IP nem a cadeia
+-- User-Agent. A pagina de estatisticas diz "sem nomes, sem IPs" e o aviso de
+-- privacidade diz o mesmo; para desenhar um icone de telemovel basta a palavra
+-- "telemovel", e o User-Agent completo e uma impressao digital do aparelho.
+CREATE TABLE IF NOT EXISTS presenca (
+    participante TEXT PRIMARY KEY,
+    visto        TEXT NOT NULL,
+    dispositivo  TEXT,
+    pagina       TEXT
+);
 """
+
+# Ao fim de quantos segundos sem um pedido se considera que a pessoa saiu. Cinco
+# minutos: quem esta a ler um PDF de dez paginas nao faz pedido nenhum durante
+# minutos e continua la, e um limite de um minuto punha a turma toda a piscar
+# entre online e offline.
+SEGUNDOS_ONLINE = 300
 
 
 def abrir(
@@ -242,6 +264,91 @@ def documentos_mais_abertos(conexao: sqlite3.Connection, limite: int = 40):
 
 
 
+# ---------------------------------------------------------------- presenca
+
+
+def marcar_presenca(
+    conexao: sqlite3.Connection,
+    participante: str,
+    dispositivo: str | None = None,
+    pagina: str | None = None,
+) -> None:
+    """Reescreve a linha desta pessoa. Chamada a cada pedido autenticado.
+
+    E um UPSERT numa tabela de oito linhas, portanto custa menos de um
+    milissegundo - mas mesmo assim quem chama esta funcao estrangula-a no tempo
+    (`presenca.py`), porque o indice vive num disco mecanico e escrever uma vez
+    por pedido de cada aluno e escrever muito mais vezes do que a informacao
+    muda.
+    """
+    agora = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    with _tranca, conexao:
+        conexao.execute(
+            "INSERT INTO presenca (participante, visto, dispositivo, pagina)"
+            " VALUES (?, ?, ?, ?)"
+            " ON CONFLICT(participante) DO UPDATE SET"
+            "   visto = excluded.visto,"
+            # COALESCE: um pedido sem User-Agent (curl, uma sonda) nao deve
+            # apagar o aparelho que ja se sabia.
+            "   dispositivo = COALESCE(excluded.dispositivo, presenca.dispositivo),"
+            "   pagina = COALESCE(excluded.pagina, presenca.pagina)",
+            (participante, agora, dispositivo, pagina),
+        )
+
+
+def presencas(conexao: sqlite3.Connection) -> dict[str, dict]:
+    """Tudo o que se sabe sobre quando cada pessoa esteve aqui, por rotulo."""
+    cursor = conexao.execute(
+        "SELECT participante, visto, dispositivo, pagina FROM presenca"
+    )
+    return {
+        linha[0]: {"visto": linha[1], "dispositivo": linha[2], "pagina": linha[3]}
+        for linha in cursor.fetchall()
+    }
+
+
+def ultimos_eventos(conexao: sqlite3.Connection) -> dict[str, dict]:
+    """O evento mais recente de cada participante, numa consulta so.
+
+    Uma por pessoa seriam oito idas ao disco para desenhar uma tabela; o
+    `MAX(id)` agrupado resolve tudo de uma vez. O id serve de relogio porque e
+    AUTOINCREMENT: o `momento` tem resolucao de segundos e dois eventos no mesmo
+    segundo empatavam.
+    """
+    cursor = conexao.execute(
+        "SELECT participante, tipo, consulta, disciplina, doc_id, momento"
+        " FROM eventos WHERE id IN (SELECT MAX(id) FROM eventos GROUP BY participante)"
+    )
+    colunas = [c[0] for c in cursor.description]
+    return {linha[0]: dict(zip(colunas, linha)) for linha in cursor.fetchall()}
+
+
+def ultimo_id(conexao: sqlite3.Connection) -> int:
+    """O numero do evento mais recente. Serve de relogio exacto.
+
+    O `momento` tem resolucao de segundos, e isso chega para um grafico mas nao
+    para responder a "o que aconteceu depois de eu ter olhado": um evento
+    registado no mesmo segundo da marca tem o mesmo carimbo e a comparacao
+    deixa-o de fora. O id e AUTOINCREMENT e nao tem esse problema.
+    """
+    return _um(conexao, "SELECT MAX(id) FROM eventos")
+
+
+def contar_depois_de(conexao: sqlite3.Connection, tipo: str, marca: int) -> int:
+    """Quantos eventos deste tipo entraram depois do evento numero `marca`."""
+    return _um(
+        conexao,
+        "SELECT COUNT(*) FROM eventos WHERE tipo = ? AND id > ?",
+        (tipo, marca),
+    )
+
+
+def totais_por_tipo(conexao: sqlite3.Connection) -> dict[str, int]:
+    return dict(
+        conexao.execute("SELECT tipo, COUNT(*) FROM eventos GROUP BY tipo").fetchall()
+    )
+
+
 def apagar_antigos(conexao, dias: int = DIAS_DE_RETENCAO) -> int:
     """Apaga os eventos mais velhos do que `dias`. Devolve quantos saíram.
 
@@ -255,7 +362,32 @@ def apagar_antigos(conexao, dias: int = DIAS_DE_RETENCAO) -> int:
     limite = (datetime.now(timezone.utc).date() - timedelta(days=dias)).isoformat()
     with _tranca, conexao:
         cursor = conexao.execute("DELETE FROM eventos WHERE dia < ?", (limite,))
+        # A presenca tambem sai: e uma linha por pessoa, mas continua a ser um
+        # "esta pessoa esteve aqui" e nao tem razao para sobreviver ao prazo.
+        conexao.execute("DELETE FROM presenca WHERE visto < ?", (limite,))
         return cursor.rowcount
+
+
+def zerar(conexao) -> int:
+    """Apaga o registo de uso inteiro. Devolve quantos eventos sairam.
+
+    Nao e o mesmo que `apagar_antigos`: aquilo e a retencao a funcionar, isto
+    e comecar um piloto com a folha limpa. As trezentas buscas que ha aqui
+    antes do dia 15 sao minhas, a testar - se ficassem, cada media da semana
+    de beta vinha contaminada por uso que nao e de ninguem da turma.
+
+    O VACUUM vem depois porque o SQLite nao devolve o espaco ao disco quando
+    se apaga: sem ele, o ficheiro continuaria a ter o tamanho de antes, e as
+    consultas antigas continuariam legiveis nas paginas livres com um editor
+    hexadecimal. Apagar tem de apagar.
+    """
+    with _tranca, conexao:
+        quantos = conexao.execute("DELETE FROM eventos").rowcount
+        conexao.execute("DELETE FROM presenca")
+    with _tranca:
+        conexao.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        conexao.execute("VACUUM")
+    return quantos
 
 
 def eventos_de(conexao, participante: str) -> list[dict]:
@@ -274,5 +406,8 @@ def esquecer(conexao, participante: str) -> int:
     with _tranca, conexao:
         cursor = conexao.execute(
             "DELETE FROM eventos WHERE participante = ?", (participante,)
+        )
+        conexao.execute(
+            "DELETE FROM presenca WHERE participante = ?", (participante,)
         )
         return cursor.rowcount

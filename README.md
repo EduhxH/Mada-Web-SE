@@ -17,7 +17,7 @@
 *A search engine built from scratch for one school — no Google, no Bing, no third-party search APIs. Real crawler, real inverted index, real TF-IDF ranking, persisted in SQLite and verified against a naive-search oracle.*
 
 [![Status](https://img.shields.io/badge/Status-v1.0%20Beta-2ea043?style=for-the-badge)]()
-[![Tests](https://img.shields.io/badge/Tests-458%20passing-2ea043?style=for-the-badge)]()
+[![Tests](https://img.shields.io/badge/Tests-686%20passing-2ea043?style=for-the-badge)]()
 
  The name **Madalena** was inspired by the name of my beloved girlfriend.
 
@@ -60,14 +60,16 @@ The first closed beta opens to invited students of class PSI9. This is the versi
 | **Corpus** | 1,803 documents · 18,082 unique terms · two sources (school site + Moodle) |
 | **Search quality** | MRR **0.849** — the right document ranks first for 37 of 47 real queries, top-10 for 45 |
 | **Speed** | single-digit milliseconds per query; 20 concurrent students → 100 searches in 1.8 s |
-| **Tests** | **458** passing, including a naive-search oracle |
-| **Security** | 47 probes against the running server — 46 pass, 0 critical findings |
-| **Participants** | 7 invite codes, individually revocable |
+| **Tests** | **686** passing, including a naive-search oracle |
+| **Security** | 101 probes against the running server — 47 from September's audit, 54 against the admin panel |
+| **Participants** | 8 codes — 7 students and one administrator — individually revocable, each with its own session epoch |
 
 **Everything a beta needs, and nothing it does not:**
 
 - The interface is finished — its own visual identity, light and dark, phone to projector.
 - Working pagination, section tabs, keyboard-navigable suggestions, hover previews.
+- An **admin panel**: usage, user management with live presence, a live server log, one-click Moodle checks, and a newsletter.
+- The corpus **keeps itself fresh** — three scheduled checks a day, reindexing only when a teacher actually published.
 - Four public documents: user manual (with screenshots), privacy policy, terms of use, and a takedown form.
 - Usage is logged pseudonymously, deleted automatically after 90 days, and exportable or erasable on request.
 - A security audit was run against the live server; the two actionable findings were fixed.
@@ -126,7 +128,8 @@ Zero search APIs. Every result is computed here.
 | 🔁 **Morphological Expansion** | Singular/plural variants and both sides of the 1990 orthographic reform (`adotados` ↔ `adoptados`) are added to the query — rules propose, the index vocabulary decides, so nothing is ever invented. 94 spelling pairs coexist in this corpus, school documents predating the reform and students not. A length floor keeps `apto` from collapsing into `ato`. | ✅ Done |
 | ⬆️ **Title Boost** | A hit in the title outweighs one in the body — the title says what a document *is*, the body only what it mentions. The weight was not chosen but swept from 0 to 10 against the evaluation set: the gain grows to 3.0 and plateaus, with no query regressing. Applied after ranking, at no extra I/O cost. | ✅ Done |
 | 📊 **TF-IDF Ranking** | TF = freq / doc length, IDF = log(N / df); rare terms weigh more, long documents don't win by length alone. | ✅ Done |
-| 🧪 **Oracle-verified Tests** | 458 pytest tests; the integration suite proves the index returns exactly what the naive search returns. | ✅ Done |
+| 🛠️ **Admin Panel** | Six sections behind an `admin-` code: usage, user management with live presence and device, a **live server log**, one-click Moodle checks, a newsletter editor, and a profile photo. The newsletter's markup never becomes HTML — everything is escaped before any rule is applied, and images may only come from this machine. | ✅ Done |
+| 🧪 **Oracle-verified Tests** | 686 pytest tests; the integration suite proves the index returns exactly what the naive search returns. | ✅ Done |
 | ⏱️ **Naive vs. Indexed Benchmark** | `scripts/comparar_busca.py` times both paths on the real corpus and checks they agree. | ✅ Done |
 | 💻 **CLI** | `indexar` / `buscar` subcommands plus an interactive prompt with context snippets. | ✅ Done |
 | 🖥️ **Local Web UI** | Plain, dependency-free search page (standard-library HTTP server, term highlighting): `python main.py web`. | ✅ Done |
@@ -134,7 +137,7 @@ Zero search APIs. Every result is computed here.
 | 📎 **PDF Capture** | Crawled PDFs are saved too; an `_origens.json` manifest preserves each file's URL (meta tags can't be injected into a PDF), so results link to the real document at the right page. | ✅ Done |
 | 🌐 **HTML Parsing** | BeautifulSoup extraction with nav/header/footer/script stripped, real `<title>` as document title. | ✅ Done |
 | 🔐 **Invite-code Access** | Per-participant codes exchanged for an HMAC-signed cookie; every route but the login page is closed. Individual codes make usage measurable per person and revocable one at a time. | ✅ Done |
-| 📈 **Usage Analytics** | Separate SQLite log of searches, clicks (with result position), previews and accepted suggestions. `/estatisticas` renders hand-built SVG charts — zero libraries, zero data leaving the machine. Pseudonymised: no names, no IPs. | ✅ Done |
+| 📈 **Usage Analytics** | Separate SQLite log of searches, clicks (with result position), previews and accepted suggestions, rendered as hand-built SVG charts — zero libraries, zero data leaving the machine. Pseudonymised: no names, no IPs. Lives inside the admin panel: a pilot's own numbers are not something the pilot's participants need to read. | ✅ Done |
 | 💡 **Query Suggestions** | Dropdown combining the participant's own history, queries popular across the group, and real index vocabulary completing the last word. Only ever suggests queries that returned results. | ✅ Done |
 | 🧭 **Discipline Landing** | Picking a subject with no query shows its characteristic topics (discipline-level TF-IDF, with a coverage ceiling that filters out boilerplate), what the class searched for, and its most-opened documents. | ✅ Done |
 | 🧠 **Portuguese POS Tagging** | Suffix-rule tagger that demotes infinitives, gerunds, participles, adverbs and conjugated forms from topic candidates, guarded by exception lists so nouns like *professor*, *calor* or *velocidade* survive. Demotion only affects topic suggestions — never the index or search. | ✅ Done |
@@ -309,6 +312,15 @@ Codes are shown **once** and stored only as an HMAC hash. To replace a lost one:
 .venv\Scripts\python main.py participantes --revogar aluno-03 --criar 1
 ```
 
+`--zerar` revokes every code at once, for starting a cohort without dragging
+the test codes along — a code that has been through screenshots and notes is
+not a code any more. Labels are numbered per prefix, so the first
+administrator is `admin-01` even when seven students already exist:
+
+```bash
+.venv\Scripts\python main.py participantes --zerar --criar 1 --admin
+```
+
 ```bash
 .venv\Scripts\python main.py web
 ```
@@ -376,13 +388,12 @@ picking one: the title weight and the discipline partition.
 ```
 
 The timetable is a single 42-page PDF covering every class, replaced weekly at
-an unchanging Moodle address. The command decides for itself whether now is a
-moment worth checking, so the Windows Task Scheduler can simply run
-`scriptsigiar_horario.cmd` **every hour** and let the code hold the rule:
-
-```bash
-schtasks /create /tn "Madalena - horario" /tr "%CD%\scriptsigiar_horario.cmd" /sc hourly
-```
+an unchanging Moodle address. The command decides for itself whether *now* is a
+moment worth checking — Thursday and Friday from noon, any hour at the weekend,
+and never again once that week's file is in. So a scheduler can run it **every
+hour** and let the tested code hold the rule (step 11). The scheduler is told
+nothing about how a school publishes timetables: that rule lives in one place,
+and a copy of it in a task definition is a copy nobody would remember to change.
 
 Add `--forcar` to check outside the window. Reindexing only happens when the
 file actually changed.
@@ -406,18 +417,95 @@ that is 236 of 305 modules, which is exactly why the record is needed. A
 full `moodle` sync still retries them, so a folder filled in later is not
 lost.
 
-To run it unattended, point the Windows Task Scheduler at
-`scripts\verificar_diario.cmd`, which checks, syncs and reindexes, logging
-everything to `data\verificacao.log`:
+Anything found appears in the web interface, on the search page and at
+`/novidades`. Step 11 puts it on a timer.
+
+**11. Let it run by itself**
 
 ```bash
-schtasks /create /tn "Madalena - verificar Moodle" /tr "%CD%\scripts\verificar_diario.cmd" /sc daily /st 07:30
+powershell -ExecutionPolicy Bypass -File scripts\agendar.ps1
 ```
 
-Anything found appears in the web interface, on the search page and at
-`/novidades`.
+Four Windows scheduled tasks, all under `\Madalena\`:
 
-**11. Tests, benchmark and usage stats**
+| Task | When | What it does |
+|---|---|---|
+| `conteudos-manha` | 07:30, daily | ask Moodle what is new; reindex **only** if something is |
+| `conteudos-tarde` | 14:30, daily | the same |
+| `conteudos-noite` | 21:30, daily | the same |
+| `horario` | every hour | ask the code whether the timetable is due |
+
+Three checks a day rather than one, because a teacher posts the worksheet when
+it suits them: checking only at dawn leaves the class a day behind the
+afternoon lesson. Each check is about 14 requests and 14 seconds — cheap enough
+to repeat, which is the whole point of `--verificar` existing.
+
+Reindexing is the expensive half, about two minutes. Ninety runs in September
+would be three hours of CPU spent confirming that nobody published anything, so
+it is paid for only when there is something to index. `scripts/tarefa.py` asks
+by **exit code** — `10` means new material — and not by matching the printed
+text: the text changes whenever a sentence is improved, and a contract does not.
+
+Two details that are about living with it rather than about correctness. The
+tasks run `pythonw.exe`, so nothing appears on screen — a black console popping
+up every hour is bad at a desk and worse with a classroom projector connected.
+And the timetable watch stays **silent** when it decides not to act: twenty-four
+"nothing to do" lines a day would bury the day it did something. What either
+task does print goes to `data\verificacao.log` and `data\horario.log`, which is
+the only witness an unattended job has.
+
+The tasks expire on **30 September 2026** — `-Ate` moves that date, `-Remover`
+deletes them. The expiry is deliberate: something that reaches out to the
+school's server should stop because it was told to, not keep going because
+nobody remembered it existed.
+
+**12. The admin panel**
+
+A code whose label starts with `admin-` unlocks `/painel`. Everyone else gets a
+403 — including on `/estatisticas`, which used to be open to every participant
+and now redirects here.
+
+| Section | What it answers |
+|---|---|
+| Visão geral | Is the class using this, and is the machine standing up? |
+| Utilizadores | Who has a code, who is on right now, from what device, doing what |
+| Registo | What is the server doing — and what broke |
+| Automatização | Check Moodle or the timetable **now**, without the terminal |
+| Newsletter | Write, preview, publish; upload images, GIFs and video |
+| Perfil | The photo that appears beside your name on a post |
+
+Five decisions worth knowing before reading the code.
+
+**Presence stores a word, not a fingerprint.** The panel draws a phone or a
+monitor icon, so what is kept is the word `telemovel` — not the User-Agent
+string, which identifies the device. No IP is stored anywhere in this project
+and this did not become the exception. The write is throttled to one every 30
+seconds per person: nobody can tell "seen 4 seconds ago" from "seen 30", and the
+index lives on a mechanical disk.
+
+**The log is deliberately volatile.** Request lines carry what people typed into
+the search box, so they live in memory and die with the process. Warnings and
+errors — which carry no queries — also go to `data\servidor.log`, because after
+a crash that file is the only witness. The panel's own polling is **not** logged:
+it asks every 2.5 s, and logging that filled the log with the log.
+
+**The newsletter preview is rendered by the server.** The editor posts the text
+and gets HTML back. Writing a second renderer in JavaScript would mean two
+definitions of what the markup means, and the one that matters — the one
+deciding what is safe to show — is the Python one. What you see in the editor is
+literally what the class receives.
+
+**Uploads are checked by their first bytes, not their extension.** A `.png` that
+is not a PNG is refused, and the stored filename is a hash of the content, so
+there is no path from outside to traverse. SVG is not on the allowlist: it is
+the one image format that is a document with `<script>` in it.
+
+**One live request per tick, not three.** The rate limiter allows 120 requests a
+minute per participant. Three separate pollers spent half of that before the
+admin clicked anything; each page now says what it wants and fetches it in one
+call.
+
+**13. Tests, benchmark and usage stats**
 
 ```bash
 .venv\Scripts\python -m pytest
@@ -430,6 +518,12 @@ Anything found appears in the web interface, on the search page and at
 ```bash
 .venv\Scripts\python main.py estatisticas
 ```
+
+`--zerar` empties the usage log, which is what you want the day before a pilot:
+the three hundred searches sitting there are the developer's own, and left in
+place they would contaminate every average of the first real week. It runs
+`VACUUM` afterwards, because SQLite does not hand freed pages back to the disk
+and the old queries would stay readable in them with a hex editor.
 
 ---
 
@@ -471,7 +565,13 @@ Mada-Web-SE/
 │   │   ├── protecao.py          # Rate limiting, security headers, tunnel detection
 │   │   ├── preview.py           # Result preview fragments
 │   │   ├── disciplina.py        # Discipline landing page
-│   │   └── estatisticas.py      # Analytics page with hand-built SVG charts
+│   │   ├── estatisticas.py      # Analytics page with hand-built SVG charts
+│   │   ├── painel.py            # Admin panel: six sections, one live endpoint
+│   │   ├── marcacao.py          # Newsletter markup -> safe HTML (escape first)
+│   │   ├── media.py             # Uploads: multipart by hand, magic-byte check
+│   │   ├── presenca.py          # Who is online, from what kind of device
+│   │   ├── registo.py           # Server log: memory live, disk for the bad news
+│   │   └── operacoes.py         # "Run it now" buttons, one at a time
 │   ├── analytics/
 │   │   └── uso.py               # Usage event log and aggregations
 │   └── models/
@@ -487,10 +587,10 @@ Mada-Web-SE/
 │   ├── avaliar_busca.py         # Search quality against the evaluation set
 │   ├── indexar_semantica.py     # Builds the embedding index
 │   ├── publicar_tunel.py        # Tunnel + stable redirect page
-│   ├── verificar_diario.cmd     # Scheduled Moodle check + reindex
-│   ├── vigiar_horario.cmd       # Hourly timetable watch
+│   ├── tarefa.py                # One scheduled step: check, reindex if needed
+│   ├── agendar.ps1              # Registers the four scheduled tasks
 │   └── pagina_publica.html      # Redirect page template
-├── tests/{unit,integration}/    # 458 tests
+├── tests/{unit,integration}/    # 686 tests
 ├── main.py                      # CLI entry point
 └── .env.example                 # Signing key and Moodle credentials
 ```
@@ -545,6 +645,8 @@ Mada-Web-SE/
 - [x] Public documents: manual with screenshots, privacy policy, terms of use, takedown form
 - [x] RGPD groundwork: 90-day retention, per-participant export and erasure, corrected notice
 - [x] Security audit: 47 probes, two findings fixed
+- [x] Scheduled upkeep: three Moodle checks a day, reindex only when something is new
+- [x] Admin panel: presence, live log, manual runs, newsletter — statistics closed to students
 - [x] **v1.0 — ready for the closed beta of 15 September 2026**
 - [ ] Capture the Moodle section name to tell same-named files apart
 - [ ] OR queries, exact phrases, stemming

@@ -582,6 +582,102 @@ footer.rodape a:hover { color: var(--texto-2); }
 .credito span { letter-spacing: .14em; }
 footer.rodape, .folha-rodape { align-items: center; }
 
+/* ---------- newsletter (lida pelos alunos e pre-vista no painel) ---------- */
+
+.nl-post {
+  border-top: 1px solid var(--linha); padding: 36px 0 40px; max-width: 720px;
+}
+.nl-post:first-of-type { border-top: none; }
+.nl-post > h2.nl-cabeca {
+  margin: 10px 0 0; font-family: var(--display); font-weight: 400;
+  font-size: clamp(1.5rem, 3vw, 2.1rem); line-height: 1.18;
+  letter-spacing: -.02em;
+}
+.nl-meta {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  font-family: var(--mono); font-size: 10px; text-transform: uppercase;
+  letter-spacing: .14em; color: var(--texto-4);
+}
+.nl-meta .rascunho {
+  border: 1px solid var(--linha-forte); padding: 2px 7px; color: var(--texto-2);
+}
+.nl-retrato {
+  width: 26px; height: 26px; object-fit: cover; flex: none;
+  border: 1px solid var(--linha);
+}
+.nl-corpo { margin-top: 18px; font-size: 15px; line-height: 1.75; color: var(--texto-2); }
+.nl-corpo > *:first-child { margin-top: 0; }
+.nl-corpo p { margin: 0 0 16px; }
+.nl-corpo strong { color: var(--texto); font-weight: 600; }
+.nl-corpo a { color: var(--texto); text-decoration: underline; text-underline-offset: 3px; }
+.nl-corpo code {
+  font-family: var(--mono); font-size: .88em;
+  background: var(--suave); padding: 1px 5px;
+}
+.nl-corpo h2.nl-titulo, .nl-corpo h3.nl-titulo {
+  margin: 28px 0 12px; color: var(--texto); letter-spacing: -.02em;
+}
+.nl-corpo h2.nl-titulo { font-size: 20px; }
+.nl-corpo h3.nl-titulo { font-size: 16px; }
+.nl-corpo ul, .nl-corpo ol { margin: 0 0 16px; padding-left: 22px; }
+.nl-corpo li { margin: 4px 0; }
+.nl-corpo blockquote {
+  margin: 0 0 16px; padding: 2px 0 2px 18px;
+  border-left: 1px solid var(--linha-forte); color: var(--texto-3);
+}
+.nl-corpo hr.nl-linha { border: none; border-top: 1px solid var(--linha); margin: 28px 0; }
+.nl-corpo figure { margin: 20px 0; }
+.nl-corpo img.nl-img, .nl-corpo video.nl-video {
+  display: block; width: 100%; height: auto; border: 1px solid var(--linha);
+}
+.nl-corpo video.nl-video { background: #000; }
+
+/* ---------- newsletter (lida pelos alunos, pre-vista no painel) ---------- */
+
+.nl-post { border-top: 1px solid var(--linha); padding: 34px 0 38px; max-width: 720px; }
+.nl-post:first-of-type { border-top: none; }
+.nl-post h2.nl-cabeca {
+  margin: 10px 0 0; font-family: var(--display); font-weight: 400;
+  font-size: clamp(1.5rem, 3vw, 2.1rem); line-height: 1.18; letter-spacing: -.02em;
+}
+.nl-meta {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  font-family: var(--mono); font-size: 10px; text-transform: uppercase;
+  letter-spacing: .14em; color: var(--texto-4);
+}
+.nl-meta .rascunho {
+  border: 1px solid var(--linha-forte); padding: 2px 7px; color: var(--texto-2);
+}
+.nl-retrato {
+  width: 26px; height: 26px; object-fit: cover; flex: none;
+  border: 1px solid var(--linha);
+}
+.nl-corpo { margin-top: 18px; font-size: 15px; line-height: 1.75; color: var(--texto-2); }
+.nl-corpo > *:first-child { margin-top: 0; }
+.nl-corpo p { margin: 0 0 16px; }
+.nl-corpo strong { color: var(--texto); font-weight: 600; }
+.nl-corpo a { color: var(--texto); text-decoration: underline; text-underline-offset: 3px; }
+.nl-corpo code {
+  font-family: var(--mono); font-size: .88em; background: var(--suave); padding: 1px 5px;
+}
+.nl-corpo h2.nl-titulo, .nl-corpo h3.nl-titulo {
+  margin: 28px 0 12px; color: var(--texto); letter-spacing: -.02em;
+}
+.nl-corpo h2.nl-titulo { font-size: 20px; }
+.nl-corpo h3.nl-titulo { font-size: 16px; }
+.nl-corpo ul, .nl-corpo ol { margin: 0 0 16px; padding-left: 22px; }
+.nl-corpo li { margin: 4px 0; }
+.nl-corpo blockquote {
+  margin: 0 0 16px; padding: 2px 0 2px 18px;
+  border-left: 1px solid var(--linha-forte); color: var(--texto-3);
+}
+.nl-corpo hr.nl-linha { border: none; border-top: 1px solid var(--linha); margin: 26px 0; }
+.nl-corpo figure { margin: 20px 0; }
+.nl-corpo img.nl-img, .nl-corpo video.nl-video {
+  display: block; width: 100%; height: auto; border: 1px solid var(--linha);
+}
+.nl-corpo video.nl-video { background: #000; }
+
 /* ---------- tablet ---------- */
 
 @media (max-width: 1080px) {
@@ -688,8 +784,12 @@ GUIAO_BOTAO_TEMA = """
 """
 
 
-def cabeca(titulo: str) -> str:
-    """O <head> comum a todas as paginas."""
+def cabeca(titulo: str, extra: str = "") -> str:
+    """O <head> comum a todas as paginas.
+
+    `extra` acrescenta CSS de uma pagina so - e por ai que entra a folha do
+    painel, que nao tem que viajar em cada busca de cada aluno.
+    """
     return (
         "<!doctype html>\n"
         '<html lang="pt-pt">\n'
@@ -704,7 +804,7 @@ def cabeca(titulo: str) -> str:
         '<link rel="preload" as="font" type="font/woff2" crossorigin '
         'href="/estatico/libre-bodoni.woff2">\n'
         f"<script>{GUIAO_TEMA}</script>\n"
-        f"<style>{CSS}</style>\n"
+        f"<style>{CSS}{extra}</style>\n"
         "</head>"
     )
 
@@ -741,20 +841,31 @@ def botao_tema() -> str:
     )
 
 
-def acoes(pagina: str = "busca") -> str:
+def acoes(pagina: str = "busca", administrador: bool = False) -> str:
     """Os botoes do canto superior direito.
 
-    O `sair` fecha a sessao e fica no canto - nao no rodape, onde estava:
-    numa pagina de resultados o rodape fica a dez rolamentos de distancia.
+    O `sair` fecha a sessao e fica no canto - nao no rodape, onde estava: numa
+    pagina de resultados o rodape fica a dez rolamentos de distancia.
+
+    O acesso ao painel so aparece a quem e administrador. Nao e so uma questao
+    de aparencia: mostrar um botao que devolve 403 ensina o aluno a bater numa
+    porta fechada, e faz a interface parecer avariada quando esta a funcionar
+    exactamente como deve.
     """
     novidades = " ligada" if pagina == "novidades" else ""
-    estatisticas = " ligada" if pagina == "estatisticas" else ""
+    painel = " ligada" if pagina.startswith("painel") else ""
+    gestao = (
+        f'<a class="icone-botao{painel}" href="/painel" '
+        f'title="painel de administração" aria-label="painel de administração">'
+        f'{icones.svg("painel", 16)}</a>'
+        if administrador
+        else ""
+    )
     return (
         '<div class="acoes">'
         f"{som.botao()}{botao_tema()}"
         f'<a class="texto-accao{novidades}" href="/novidades">novidades</a>'
-        f'<a class="icone-botao{estatisticas}" href="/estatisticas" '
-        f'title="estatísticas" aria-label="estatísticas">{icones.svg("grafico", 16)}</a>'
+        f"{gestao}"
         '<a class="icone-botao" href="/sair" title="sair" aria-label="sair">'
         f'{icones.svg("sair", 16)}</a>'
         "</div>"

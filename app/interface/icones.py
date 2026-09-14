@@ -77,6 +77,83 @@ _FORMAS = {
         '<path d="M4 9.5h3.5L12 5.5v13L7.5 14.5H4Z"/>'
         '<path d="M16.5 10l4 4M20.5 10l-4 4"/>'
     ),
+    # ---- aparelhos, para a coluna de quem esta online ----
+    "telemovel": (
+        '<path d="M7 2.8h10a1.2 1.2 0 0 1 1.2 1.2v16a1.2 1.2 0 0 1-1.2 1.2H7'
+        'A1.2 1.2 0 0 1 5.8 20V4A1.2 1.2 0 0 1 7 2.8Z"/>'
+        '<path d="M10.5 18.5h3"/>'
+    ),
+    "tablet": (
+        '<path d="M5 3.2h14a1 1 0 0 1 1 1v15.6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4.2'
+        'a1 1 0 0 1 1-1Z"/><path d="M10.5 18h3"/>'
+    ),
+    "computador": (
+        '<path d="M3 5h18v10H3Z"/><path d="M8.5 19h7"/><path d="M12 15v4"/>'
+    ),
+    # ---- painel de administracao ----
+    "painel": (
+        '<path d="M4 4h7v7H4ZM13 4h7v4.5h-7ZM13 10.5h7V20h-7ZM4 13h7v7H4Z"/>'
+    ),
+    "pessoas": (
+        '<circle cx="9" cy="8" r="3.2"/>'
+        '<path d="M3.5 20c0-3 2.5-5 5.5-5s5.5 2 5.5 5"/>'
+        '<path d="M16 5.5a3 3 0 0 1 0 5.6"/><path d="M17.5 15c1.8.6 3 2.2 3 5"/>'
+    ),
+    "pessoa": (
+        '<circle cx="12" cy="8" r="3.6"/>'
+        '<path d="M5 20.5c0-3.4 3-6 7-6s7 2.6 7 6"/>'
+    ),
+    "terminal": (
+        '<path d="M3 5.5h18v13H3Z"/><path d="M7 10l2.5 2L7 14"/>'
+        '<path d="M12.5 14.5H17"/>'
+    ),
+    "engrenagem": (
+        '<circle cx="12" cy="12" r="3"/>'
+        '<path d="M12 2.8v2.4M12 18.8v2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7'
+        'M2.8 12h2.4M18.8 12h2.4M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7"/>'
+    ),
+    "jornal": (
+        '<path d="M3.5 5.5h13v13h-13Z"/><path d="M16.5 9h4v7.5a2 2 0 0 1-2 2h-2Z"/>'
+        '<path d="M6.5 9h7M6.5 12h7M6.5 15h4"/>'
+    ),
+    "imagem": (
+        '<path d="M3.5 4.5h17v15h-17Z"/><circle cx="8.5" cy="9.5" r="1.6"/>'
+        '<path d="M3.5 16.5 9 11.5l4 3.5 3-2.5 4.5 4"/>'
+    ),
+    "video": (
+        '<path d="M3.5 5.5h11v13h-11Z"/><path d="M14.5 10.5 20.5 7v10l-6-3.5Z"/>'
+    ),
+    "ligacao": (
+        '<path d="M10 13.5a3.5 3.5 0 0 0 5 0l3-3a3.5 3.5 0 0 0-5-5l-1 1"/>'
+        '<path d="M14 10.5a3.5 3.5 0 0 0-5 0l-3 3a3.5 3.5 0 0 0 5 5l1-1"/>'
+    ),
+    "lixo": (
+        '<path d="M4.5 7h15"/><path d="M9.5 7V4.5h5V7"/>'
+        '<path d="M6.5 7l1 12.5h9L17 7"/><path d="M10.5 10.5v6M13.5 10.5v6"/>'
+    ),
+    "mais": '<path d="M12 5v14M5 12h14"/>',
+    "atualizar": (
+        '<path d="M20 12a8 8 0 1 1-2.5-5.8"/><path d="M20.5 4v4h-4"/>'
+    ),
+    "tocar": '<path d="M7 4.5 19 12 7 19.5Z"/>',
+    "chave": (
+        '<circle cx="8" cy="12" r="4"/><path d="M12 12h9"/>'
+        '<path d="M17 12v3M20 12v2.5"/>'
+    ),
+    "proibido": '<circle cx="12" cy="12" r="8.5"/><path d="M6.2 6.2l11.6 11.6"/>',
+    "visto": '<path d="M5 12.5 9.5 17 19 7.5"/>',
+    "alerta": (
+        '<path d="M12 3.8 21.5 20H2.5Z"/><path d="M12 9.5v5"/><path d="M12 17.2v.1"/>'
+    ),
+    "guardar": (
+        '<path d="M4.5 4.5h11L19.5 8.5v11h-15Z"/><path d="M8 4.5v5h7v-5"/>'
+        '<path d="M8 19.5v-6h8v6"/>'
+    ),
+    "campainha": (
+        '<path d="M6.5 10a5.5 5.5 0 0 1 11 0c0 4 1.5 5.5 1.5 5.5H5S6.5 14 6.5 10Z"/>'
+        '<path d="M10 18.5a2.2 2.2 0 0 0 4 0"/>'
+    ),
+    "relampago": '<path d="M13.5 2.5 5 13.5h5.5L10 21.5l8.5-11H13Z"/>',
     "vazio": (
         '<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>'
         '<path d="M8.5 11h5"/>'
