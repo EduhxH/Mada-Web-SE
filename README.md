@@ -426,7 +426,7 @@ Anything found appears in the web interface, on the search page and at
 powershell -ExecutionPolicy Bypass -File scripts\agendar.ps1
 ```
 
-Four Windows scheduled tasks, all under `\Madalena\`:
+Five Windows scheduled tasks, all under `\Madalena\`:
 
 | Task | When | What it does |
 |---|---|---|
@@ -434,6 +434,7 @@ Four Windows scheduled tasks, all under `\Madalena\`:
 | `conteudos-tarde` | 14:30, daily | the same |
 | `conteudos-noite` | 21:30, daily | the same |
 | `horario` | every hour | ask the code whether the timetable is due |
+| `no-ar` | at logon, watched every 5 min | keep the server and the tunnel up, and the machine awake |
 
 Three checks a day rather than one, because a teacher posts the worksheet when
 it suits them: checking only at dawn leaves the class a day behind the
@@ -453,6 +454,21 @@ And the timetable watch stays **silent** when it decides not to act: twenty-four
 "nothing to do" lines a day would bury the day it did something. What either
 task does print goes to `data\verificacao.log` and `data\horario.log`, which is
 the only witness an unattended job has.
+
+**Staying reachable is its own job.** `scripts/no_ar.py` watches three things
+that fail quietly overnight. The machine falls asleep — this one's power plan
+suspends after 15 idle minutes, and a laptop serving a site looks perfectly idle
+to Windows; instead of changing a system setting that would stay changed
+forever, it asks Windows not to suspend **while the process lives**
+(`ES_SYSTEM_REQUIRED`, no `ES_DISPLAY_REQUIRED` — the screen may go dark). The
+server dies — it gets brought back. The tunnel drops — a new one is opened and
+the GitHub Pages link is republished to point at it, which is why students
+bookmark that link and not the tunnel. Measured: about **50 seconds** from a
+dead tunnel to a working one.
+
+Only one watcher may run: it holds port 8079 as a latch. A PID file would not
+do, because a watcher killed badly leaves the file behind and the next one has
+to guess; the OS releases a port the instant the process ends, however it ends.
 
 The tasks expire on **30 September 2026** — `-Ate` moves that date, `-Remover`
 deletes them. The expiry is deliberate: something that reaches out to the
@@ -588,6 +604,7 @@ Mada-Web-SE/
 │   ├── indexar_semantica.py     # Builds the embedding index
 │   ├── publicar_tunel.py        # Tunnel + stable redirect page
 │   ├── tarefa.py                # One scheduled step: check, reindex if needed
+│   ├── no_ar.py                 # Keeps server, tunnel and machine up
 │   ├── agendar.ps1              # Registers the four scheduled tasks
 │   └── pagina_publica.html      # Redirect page template
 ├── tests/{unit,integration}/    # 686 tests

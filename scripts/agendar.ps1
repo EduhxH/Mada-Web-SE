@@ -3,12 +3,13 @@
     Registra (ou remove) as tarefas agendadas da Madalena Search no Windows.
 
 .DESCRIPTION
-    Quatro tarefas, todas em \Madalena\ no Agendador de Tarefas:
+    Cinco tarefas, todas em \Madalena\ no Agendador de Tarefas:
 
         conteudos-manha   07:30   todos os dias
         conteudos-tarde   14:30   todos os dias
         conteudos-noite   21:30   todos os dias
         horario           de hora a hora, todos os dias
+        no-ar             ao entrar na sessao, e vigiada de 5 em 5 minutos
 
     As tres primeiras procuram material novo no Moodle e reindexam so quando
     ha. Sao tres e nao uma porque um professor publica a ficha quando lhe da
@@ -42,6 +43,7 @@
 [CmdletBinding()]
 param(
     [datetime] $Ate = '2026-09-30 23:59',
+    [int]      $Porta = 8080,
     [switch]   $Remover
 )
 
@@ -56,6 +58,13 @@ $tarefas = @(
     @{ Nome = 'horario';         Passo = 'horario';   Etiqueta = '';      As = '00:05'; DeHoraEmHora = $true }
 )
 
+# A quinta tarefa e de outra natureza e por isso esta a parte: as quatro de cima
+# correm, fazem uma coisa e saem; esta fica a correr. E o vigia que mantem o
+# servidor e o tunel de pe e impede a maquina de suspender - ver scripts/no_ar.py.
+# Arranca com a sessao e repete-se de cinco em cinco minutos: como so pode haver
+# uma instancia, a repeticao nao duplica nada e serve de vigia do proprio vigia.
+$VIGIA = 'no-ar'
+
 # pythonw.exe e nao python.exe: nao aloca consola, portanto nada pisca no ecra.
 # A tarefa do horario corre vinte e quatro vezes por dia - uma janela preta a
 # aparecer de hora a hora seria inaceitavel com o projetor da sala ligado.
@@ -65,11 +74,11 @@ foreach ($caminho in @($interprete, $guiao)) {
     if (-not (Test-Path $caminho)) { throw "Nao encontrei: $caminho" }
 }
 
-foreach ($tarefa in $tarefas) {
-    $existente = Get-ScheduledTask -TaskPath $pasta -TaskName $tarefa.Nome -ErrorAction SilentlyContinue
+foreach ($nome in (@($tarefas | ForEach-Object { $_.Nome }) + $VIGIA)) {
+    $existente = Get-ScheduledTask -TaskPath $pasta -TaskName $nome -ErrorAction SilentlyContinue
     if ($existente) {
-        Unregister-ScheduledTask -TaskPath $pasta -TaskName $tarefa.Nome -Confirm:$false
-        Write-Host "removida  $pasta$($tarefa.Nome)"
+        Unregister-ScheduledTask -TaskPath $pasta -TaskName $nome -Confirm:$false
+        Write-Host "removida  $pasta$nome"
     }
 }
 if ($Remover) {
@@ -145,6 +154,47 @@ foreach ($tarefa in $tarefas) {
     Write-Host ("criada    {0}{1,-16} {2,-34} [{3}]" -f $pasta, $tarefa.Nome, $quando, $modo)
 }
 
+# ---------------------------------------------------------------- o vigia
+#
+# `ExecutionTimeLimit` a zero quer dizer "sem limite". As outras quatro tem uma
+# hora, que e a defesa contra um pedido pendurado no servidor da escola; esta
+# e suposto nao acabar, e uma hora mata-la-ia a meio da tarde de beta.
+$opcoesVigia = New-ScheduledTaskSettingsSet `
+    -StartWhenAvailable `
+    -MultipleInstances IgnoreNew `
+    -ExecutionTimeLimit ([TimeSpan]::Zero) `
+    -AllowStartIfOnBatteries `
+    -DontStopIfGoingOnBatteries `
+    -RestartCount 3 `
+    -RestartInterval (New-TimeSpan -Minutes 1)
+
+$accaoVigia = New-ScheduledTaskAction -Execute $interprete `
+    -Argument "`"$(Join-Path (Join-Path $raiz 'scripts') 'no_ar.py')`" --porta $Porta" `
+    -WorkingDirectory $raiz
+
+$aoEntrar = New-ScheduledTaskTrigger -AtLogOn -User $utilizador
+$deCincoEmCinco = New-ScheduledTaskTrigger -Daily -At '00:02'
+$deCincoEmCinco.Repetition = (New-ScheduledTaskTrigger -Once -At '00:02' `
+    -RepetitionInterval (New-TimeSpan -Minutes 5) `
+    -RepetitionDuration (New-TimeSpan -Hours 23)).Repetition
+$deCincoEmCinco.EndBoundary = $Ate.ToString('yyyy-MM-ddTHH:mm:ss')
+
+$registada = $null
+foreach ($principal in $principais) {
+    try {
+        $registada = Register-ScheduledTask -TaskPath $pasta -TaskName $VIGIA `
+            -Action $accaoVigia -Trigger @($aoEntrar, $deCincoEmCinco) `
+            -Settings $opcoesVigia -Principal $principal `
+            -Description 'Madalena Search - mantem o servidor e o tunel no ar. Criada por scripts\agendar.ps1.' `
+            -Force
+        break
+    } catch { $ultimo = $_ }
+}
+if (-not $registada) { throw $ultimo }
+Write-Host ("criada    {0}{1,-16} {2,-34} [{3}]" -f $pasta, $VIGIA,
+    'ao entrar, e vigiada de 5 em 5 min', $registada.Principal.LogonType)
+
 Write-Host ''
 Write-Host "Ate $($Ate.ToString('yyyy-MM-dd HH:mm')). Registos em data\verificacao.log e data\horario.log."
+Write-Host 'O projeto no ar: data\no-ar.log e o endereco em data\tunel-estado.json.'
 Write-Host 'Para desligar tudo:  powershell -ExecutionPolicy Bypass -File scripts\agendar.ps1 -Remover'

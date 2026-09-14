@@ -55,6 +55,11 @@ data/painel-visto.json
 data/sessoes-cortadas.json
 # Registo do servidor (so avisos e erros; o resto vive em memoria)
 data/servidor.log
+# O vigia que mantem o projeto no ar, e o endereco do tunel do momento
+data/no-ar.log
+data/servidor-saida.log
+data/tunel-saida.log
+data/tunel-estado.json
 data/verificacao.log
 # Registos rodados pelas tarefas agendadas (scripts/tarefa.py)
 *.log.1
