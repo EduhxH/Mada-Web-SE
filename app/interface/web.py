@@ -12,7 +12,8 @@ from app.indexing import storage
 from app.models import newsletter, novidades
 from app.interface import auth, disciplina as pagina_disciplina, estatisticas, protecao
 from app.interface import estilo, icones, movimento, paginacao, som
-from app.interface import marcacao, media, operacoes, painel, presenca
+from app.interface import copia_local, marcacao, media, operacoes, painel
+from app.interface import presenca
 from app.interface import registo as registo_servidor
 from app.interface.preview import fragmento, resolver_origem
 from app.indexing.tokenizer import tokenizar
@@ -343,7 +344,39 @@ def _pagina_entrada(erro: str = "") -> bytes:
     return corpo.encode("utf-8")
 
 
+def _nome_para_mostrar(doc, alvo) -> str:
+    """O nome com que o documento se apresenta, e nao o de arrumacao.
+
+    Em disco o ficheiro chama-se `folder-82674-Sebenta-modulo-F5-f959d47d.pdf`,
+    que e util para nao haver colisoes e inutil para quem o abre. O titulo do
+    documento traz o nome verdadeiro; tira-se-lhe o sufixo da pagina.
+    """
+    titulo = (doc.titulo or "").strip()
+    for marca in (" - pagina ", " - página ", " - slide "):
+        if marca in titulo:
+            titulo = titulo.split(marca)[0]
+            break
+    if not titulo:
+        return alvo.name
+    if not titulo.lower().endswith(alvo.suffix.lower()):
+        titulo += alvo.suffix
+    return titulo
+
+
 def _ler_arquivo(origem: str) -> tuple[bytes, str]:
+    """Os bytes do documento e o nome com que se serve.
+
+    Uma origem remota - que hoje sao todas - nao e um caminho: quem sabe onde
+    esta a copia sao os manifestos que o rastreio deixa ao lado do material.
+    `resolver_origem` foi escrita para caminhos locais e, se lhe derem um URL,
+    devolve um `Path` sem sentido.
+    """
+    if origem.startswith(("http://", "https://")):
+        alvo = copia_local.caminho_de(origem)
+        if alvo is None:
+            raise FileNotFoundError("sem copia local desta origem")
+        return alvo.read_bytes(), alvo.name
+
     caminho, interno, _, _ = resolver_origem(origem)
     resolvido = caminho.resolve()
     if not resolvido.is_relative_to(RAIZ_DADOS):
@@ -355,18 +388,32 @@ def _ler_arquivo(origem: str) -> tuple[bytes, str]:
 
 
 def _ligacao(doc, consulta: str = "", posicao: int | None = None) -> str:
+    """Para onde o titulo do resultado leva.
+
+    A nossa copia, quando existe. O Moodle serve o material das pastas com
+    `Content-Disposition: attachment` e exige sessao iniciada: quem clicava
+    levava um descarregamento em vez de uma leitura, e sem sessao nem isso -
+    ia parar a pagina de entrada do Moodle. Pior, para os ficheiros dentro de
+    pastas o endereco guardado e o da pasta, e o aluno aterrava numa listagem,
+    perdendo o numero da pagina que a busca tinha acertado.
+
+    Sobra o que nao temos em copia servivel - as paginas do site da escola -
+    e essas continuam a abrir na origem, que e onde ficam bem.
+    """
     parametros = {"id": str(doc.id)}
     if consulta:
         parametros["q"] = consulta
     if posicao:
         parametros["p"] = str(posicao)
-    if doc.origem.startswith(("http://", "https://")):
+
+    remota = doc.origem.startswith(("http://", "https://"))
+    if remota and not copia_local.ha_copia(doc.origem):
         return "/abrir?" + urlencode(parametros)
-    _, _, pagina, _ = resolver_origem(doc.origem)
-    if consulta:
-        parametros["q"] = consulta
-    if posicao:
-        parametros["p"] = str(posicao)
+
+    if remota:
+        pagina = copia_local.pagina_de(doc.origem)
+    else:
+        _, _, pagina, _ = resolver_origem(doc.origem)
     url = "/documento?" + urlencode(parametros)
     if pagina:
         url += f"#page={pagina}"
@@ -623,6 +670,23 @@ def _um_resultado(
     if quando:
         origem.append('<span class="ponto"></span>')
         origem.append(f"<span>{quando}</span>")
+
+    # Quando o titulo abre a nossa copia, a origem tem de continuar a um clique
+    # de distancia. O indice encontra; quem manda continua a ser a escola, e
+    # dize-lo em cada resultado e a forma de isso ser verdade e nao so uma
+    # frase num documento.
+    if doc.origem.startswith(("http://", "https://")) and copia_local.ha_copia(
+        doc.origem
+    ):
+        parametros = {"id": str(doc.id)}
+        if consulta:
+            parametros["q"] = consulta
+        origem.append('<span class="ponto"></span>')
+        origem.append(
+            f'<a class="fonte" href="/abrir?{urlencode(parametros)}"'
+            ' target="_blank" rel="noopener">ver em '
+            f"{html.escape(_fonte_legivel(doc.origem))}</a>"
+        )
 
     # A pontuacao e um numero de depuracao. Nao diz nada a um aluno e, no
     # telemovel, empurrava metade do titulo para a linha seguinte. Fica para
@@ -1741,13 +1805,62 @@ class _Manipulador(BaseHTTPRequestHandler):
                 doc_id=doc.id,
                 posicao=int(posicao) if posicao.isdigit() else None,
             )
+        # Um ficheiro remoto com copia servivel vai por pedacos: e o caminho
+        # comum, e ler 30 MB para memoria por cada aluno que abre um manual era
+        # gastar memoria a troco de nada.
+        if doc.origem.startswith(("http://", "https://")):
+            alvo = copia_local.caminho_de(doc.origem)
+            if alvo is not None:
+                self._enviar_ficheiro(alvo, _nome_para_mostrar(doc, alvo))
+                return
+
         try:
             dados, nome = _ler_arquivo(doc.origem)
         except (FileNotFoundError, KeyError, PermissionError, zipfile.BadZipFile):
+            # A copia sumiu, mas o original pode estar la. Reencaminhar e pior
+            # do que servir e melhor do que um erro: o aluno chega ao documento.
+            if doc.origem.startswith(("http://", "https://")):
+                registo_servidor.anotar(
+                    registo_servidor.AVISO,
+                    f"sem copia local de {doc.id}; a mandar para a origem",
+                    "documento",
+                )
+                self._para(doc.origem.replace("#pagina=", "#page="))
+                return
             self.send_error(410, "ficheiro de origem indisponível")
             return
         tipo = mimetypes.guess_type(nome)[0] or "application/octet-stream"
         self._responder(dados, tipo, nome)
+
+    def _enviar_ficheiro(self, alvo, nome: str) -> None:
+        """Manda o ficheiro por pedacos, sem o trazer todo para memoria."""
+        try:
+            tamanho = alvo.stat().st_size
+            fonte = alvo.open("rb")
+        except OSError:
+            self.send_error(410, "ficheiro indisponível")
+            return
+
+        tipo = mimetypes.guess_type(alvo.name)[0] or "application/octet-stream"
+        with fonte:
+            self.send_response(200)
+            self.send_header("Content-Type", tipo)
+            self.send_header("Content-Length", str(tamanho))
+            # `inline`: e para ler no browser, que e a razao de tudo isto. Era o
+            # `attachment` do Moodle que obrigava a descarregar.
+            self.send_header(
+                "Content-Disposition", protecao.cabecalho_nome(nome)
+            )
+            for chave, valor in protecao.CABECALHOS_SEGURANCA.items():
+                self.send_header(chave, valor)
+            if protecao.veio_por_tunel(self):
+                self.send_header(*protecao.CABECALHO_HSTS)
+            self.end_headers()
+            while True:
+                pedaco = fonte.read(64 * 1024)
+                if not pedaco:
+                    break
+                self.wfile.write(pedaco)
 
     def _responder(
         self, corpo: bytes, tipo: str, nome: str | None = None,
@@ -1765,10 +1878,7 @@ class _Manipulador(BaseHTTPRequestHandler):
         if protecao.veio_por_tunel(self):
             self.send_header(*protecao.CABECALHO_HSTS)
         if nome:
-            seguro = protecao.sanear_nome_ficheiro(nome)
-            self.send_header(
-                "Content-Disposition", f'inline; filename="{seguro}"'
-            )
+            self.send_header("Content-Disposition", protecao.cabecalho_nome(nome))
         self.end_headers()
         self.wfile.write(corpo)
 

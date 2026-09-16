@@ -588,10 +588,17 @@ def politica_privacidade() -> Documento:
         "da União Europeia."
     )
     d.paragrafo(
-        "O acesso de fora da escola passa por um túnel cifrado da Cloudflare, que "
-        "encaminha o tráfego. Como qualquer intermediário de rede, a Cloudflare vê "
-        "que houve ligações; o conteúdo das tuas pesquisas não lhe é entregue nem "
-        "guardado por ela."
+        "O acesso de fora da escola passa por um túnel da Cloudflare, que "
+        "encaminha o tráfego entre o teu navegador e esta máquina. A ligação é "
+        "cifrada, mas é a Cloudflare que a termina: como qualquer intermediário "
+        "desse tipo, tem tecnicamente acesso ao que passa — as pesquisas que "
+        "fazes e os documentos que abres. Não lhe pedimos que guarde nada e não "
+        "há nenhum outro serviço da Cloudflare ligado a este projeto."
+    )
+    d.nota(
+        "É o preço de haver acesso de fora sem um servidor próprio, e fica dito "
+        "aqui para ser uma escolha informada e não uma surpresa. Dentro da rede "
+        "da escola o túnel não é usado."
     )
 
     d.titulo_seccao("8. Os teus direitos")
@@ -637,10 +644,10 @@ def pedido_remocao() -> Documento:
     )
 
     d.paragrafo(
-        "O Madalena é um catálogo: encontra documentos, mas não os aloja. Se "
-        "pedires a remoção, o documento deixa de aparecer nas pesquisas \u2014 mas "
-        "continua onde está, no Moodle ou no site da escola. Para o tirar de lá é "
-        "preciso falar com a escola, e nós ajudamos a fazer esse pedido."
+        "Se pedires a remoção, o documento deixa de aparecer nas pesquisas e a "
+        "cópia que serve para o abrir é apagada \u2014 mas o original continua onde "
+        "está, no Moodle ou no site da escola. Para o tirar de lá é preciso falar "
+        "com a escola, e nós ajudamos a fazer esse pedido."
     )
     d.nota(
         "Pedidos sobre dados pessoais \u2014 teus ou de outra pessoa \u2014 são tratados "
@@ -735,9 +742,41 @@ def manual_utilizador() -> Documento:
         "página no meio de um PDF de duzentas."
     )
     d.nota(
-        "O Madalena é um catálogo: encontra os documentos e leva-te até eles, mas "
-        "quem os guarda continua a ser a escola. Um documento que não esteja no "
-        "Moodle nem no site não existe aqui."
+        "O Madalena não publica nada de novo: só encontra o que a escola já "
+        "publicou. Um documento que não esteja no Moodle nem no site não existe "
+        "aqui, e cada resultado mostra onde está o original."
+    )
+
+    d.titulo_seccao("Porque é que o documento abre aqui")
+    d.paragrafo(
+        "Ao princípio o Madalena era só um catálogo: mandava-te para o Moodle e "
+        "acabava aí. Os primeiros a usá-lo queixaram-se, e tinham razão \u2014 o "
+        "Moodle serve o material das pastas para <b>descarregar</b>, não para "
+        "ler, e exige sessão iniciada. Em muitos casos nem sequer te levava ao "
+        "documento: aterravas numa lista de ficheiros, e o número da página que "
+        "a pesquisa tinha encontrado perdia-se ali."
+    )
+    d.paragrafo(
+        "Por isso o Madalena passou a mostrar a sua própria cópia: abre no "
+        "browser, abre na página certa, e não te pede para entrar em lado "
+        "nenhum. Três coisas continuam iguais, e são as que importam:"
+    )
+    d.item(
+        "<b>A fonte continua nomeada.</b> Cada resultado tem, ao lado, a "
+        "ligação para o original no Moodle ou no site."
+    )
+    d.item(
+        "<b>Nada sai desta máquina.</b> A cópia vive no computador onde o "
+        "Madalena corre, atrás do código de acesso. Não há nuvem."
+    )
+    d.item(
+        "<b>Só existe aqui o que a escola publicou.</b> O Madalena não "
+        "acrescenta material nenhum, e um documento retirado do índice tem a "
+        "cópia apagada com ele."
+    )
+    d.nota(
+        "Ficheiros muito grandes continuam a abrir no Moodle: passá-los por "
+        "aqui seria mais lento para ti do que ir buscá-los à escola."
     )
 
     # ---------------------------------------------------------------- entrar
@@ -923,14 +962,20 @@ def termos_de_uso() -> Documento:
     d.titulo_seccao("1. O que é o Madalena")
     d.paragrafo(
         "Um motor de busca sobre o material que a escola já publica: o site "
-        "sefo.pt e o Moodle. É um <b>catálogo</b> \u2014 encontra documentos e "
-        "leva-te até eles, mas não os aloja nem os substitui. A fonte continua a "
-        "ser a escola."
+        "sefo.pt e o Moodle. Encontra documentos e abre-os na página certa. A "
+        "fonte continua a ser a escola, e cada resultado leva também ao original."
     )
     d.paragrafo(
         f"É um projeto escolar desenvolvido por {RESPONSAVEL}, em fase de teste "
         "fechado. <b>Não é um serviço oficial da escola</b> e não substitui os "
         "canais oficiais."
+    )
+
+
+    d.paragrafo(
+        "Os documentos abrem a partir de uma cópia guardada nesta máquina, para "
+        "poderem ser lidos no navegador sem descarregar nada e sem sessão no "
+        "Moodle. Cada resultado leva também ao original. O manual explica porquê."
     )
 
     d.titulo_seccao("2. Quem pode usar")
@@ -995,8 +1040,8 @@ def termos_de_uso() -> Documento:
     d.titulo_seccao("6. Direitos sobre o conteúdo")
     d.paragrafo(
         "Os documentos pertencem aos seus autores e à escola. O Madalena guarda "
-        "uma cópia do texto apenas para o poder procurar, e mostra um trecho "
-        "curto nos resultados."
+        "o texto para o poder procurar e uma cópia do ficheiro para o poder "
+        "mostrar, ambas nesta máquina e ambas atrás do código de acesso."
     )
     d.paragrafo(
         "O código do próprio motor de busca é de quem o escreveu e está público "

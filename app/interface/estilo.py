@@ -393,6 +393,15 @@ input.codigo.errado { border-color: var(--texto); }
 .linha-origem .ponto {
   width: 3px; height: 3px; background: var(--texto-4); flex: none;
 }
+/* A ligacao para o original, ao lado da origem. Fica discreta de proposito: o
+   titulo e que e a accao, isto e a saida de emergencia para quem quer ver o
+   documento no sitio de onde veio. */
+.linha-origem a.fonte {
+  color: var(--texto-4); text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: color .2s var(--curva), border-color .2s var(--curva);
+}
+.linha-origem a.fonte:hover { color: var(--texto-2); border-bottom-color: var(--linha-forte); }
 .titulo { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: -.03em; line-height: 1.35; }
 .titulo a {
   color: var(--texto); text-decoration: none;

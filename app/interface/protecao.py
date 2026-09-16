@@ -7,6 +7,7 @@ tudo. E um codigo de acesso exposto convida a tentativa de forca bruta.
 import re
 import threading
 import time
+from urllib.parse import quote
 from collections import defaultdict, deque
 
 # Limite geral: uma pessoa a pesquisar depressa faz ~20 pedidos/min
@@ -60,6 +61,23 @@ def sanear_nome_ficheiro(nome: str) -> str:
     if not any(c.isalnum() for c in limpo):
         return "documento"
     return limpo[:120]
+
+
+def cabecalho_nome(nome: str, como: str = "inline") -> str:
+    """Um Content-Disposition com o nome legivel e o nome seguro.
+
+    O saneamento troca tudo o que nao e ASCII por `_`, e e por isso que
+    "Planificacao" aparecia como "Planifica__o": a defesa contra injeccao de
+    cabecalho nao distingue um cedilha de um `
+`. A RFC 6266 resolve isto
+    com um segundo parametro, `filename*`, em UTF-8 percent-encoded - e o
+    percent-encoding elimina por construcao qualquer caracter de controlo, que
+    era o perigo. Os browsers preferem o `filename*` quando o percebem e caem no
+    outro quando nao.
+    """
+    seguro = sanear_nome_ficheiro(nome)
+    codificado = quote(nome, safe="")
+    return f"{como}; filename=\"{seguro}\"; filename*=UTF-8''{codificado}"
 
 
 class Limitador:

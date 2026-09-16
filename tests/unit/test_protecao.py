@@ -156,3 +156,29 @@ def test_quem_nao_entrou_continua_contado_por_endereco():
     assert limitador.permitir("198.51.100.7")
     assert limitador.permitir("198.51.100.7")
     assert not limitador.permitir("198.51.100.7")
+
+
+def test_cabecalho_nome_leva_o_nome_real_e_o_seguro():
+    """O saneamento nao distingue um cedilha de um CRLF, e trocava os dois por `_`.
+
+    A RFC 6266 resolve com um segundo parametro em UTF-8 percent-encoded, e o
+    percent-encoding elimina por construcao os caracteres de controlo - que
+    eram o perigo de verdade.
+    """
+    cabecalho = protecao.cabecalho_nome("Planificação Mod OP8.pdf")
+    assert cabecalho.startswith("inline; ")
+    assert 'filename="Planifica__o Mod OP8.pdf"' in cabecalho
+    assert "filename*=UTF-8''Planifica%C3%A7%C3%A3o%20Mod%20OP8.pdf" in cabecalho
+
+
+def test_cabecalho_nome_neutraliza_injecao_nos_dois_parametros():
+    mau = 'evil".pdf' + chr(13) + chr(10) + "X-Mau: sim"
+    cabecalho = protecao.cabecalho_nome(mau)
+    assert chr(13) not in cabecalho and chr(10) not in cabecalho
+    # As aspas do atacante nao fecham o parametro.
+    assert cabecalho.count('"') == 2
+    assert "%0D%0A" in cabecalho
+
+
+def test_cabecalho_nome_aceita_outra_disposicao():
+    assert protecao.cabecalho_nome("a.pdf", "attachment").startswith("attachment; ")
